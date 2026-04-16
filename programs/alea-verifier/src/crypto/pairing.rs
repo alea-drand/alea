@@ -251,4 +251,64 @@ mod tests {
             "keccak256(sig) must NOT match — ADR 0036"
         );
     }
+
+    #[test]
+    #[ignore] // requires network access: cargo test bulk_validation -- --ignored
+    fn bulk_validation_110_rounds() {
+        use serde::Deserialize;
+
+        #[derive(Deserialize)]
+        struct DrandBeacon {
+            round: u64,
+            signature: String,
+            randomness: String,
+        }
+
+        let chain_hash = "04f1e9062b8a81f848fded9c12306733282b2727ecced50032187751166ec8c3";
+        let client = reqwest::blocking::Client::new();
+
+        let mut passed = 0;
+        let mut failed = 0;
+
+        for round in 1..=110u64 {
+            let url = format!("https://api.drand.sh/{}/public/{}", chain_hash, round);
+            let resp: DrandBeacon = match client.get(&url).send() {
+                Ok(r) => match r.json() {
+                    Ok(b) => b,
+                    Err(e) => {
+                        eprintln!("Round {} JSON parse error: {}", round, e);
+                        failed += 1;
+                        continue;
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Round {} fetch error: {}", round, e);
+                    failed += 1;
+                    continue;
+                }
+            };
+
+            assert_eq!(resp.round, round);
+
+            let sig_bytes = hex::decode(&resp.signature).unwrap();
+            assert_eq!(sig_bytes.len(), 64, "Round {} sig must be 64 bytes", round);
+            let sig: [u8; 64] = sig_bytes.try_into().unwrap();
+
+            let result = verify_beacon(round, &sig, &EXPECTED_EVMNET_PUBKEY);
+            assert!(result.is_some(), "Round {} verification failed", round);
+
+            let randomness = result.unwrap();
+            assert_eq!(
+                hex::encode(randomness),
+                resp.randomness,
+                "Round {} randomness mismatch: sha256(sig) != drand API",
+                round
+            );
+            passed += 1;
+        }
+
+        assert_eq!(failed, 0, "All rounds must succeed (failed: {})", failed);
+        assert_eq!(passed, 110, "Must validate exactly 110 rounds");
+        eprintln!("Bulk validation: {}/110 rounds passed", passed);
+    }
 }
