@@ -1,7 +1,9 @@
 use ark_bn254::Fq;
 use ark_ff::{AdditiveGroup, BigInteger, Field, PrimeField, Zero};
 
-use super::constants::{B, C1, C2, C3, C4, Z};
+use super::constants::{C1, C2, C3, C4, Z};
+#[cfg(not(target_os = "solana"))]
+use super::constants::B;
 
 /// Convert Fq to 32-byte big-endian representation
 pub fn fq_to_be_bytes(fq: &Fq) -> [u8; 32] {
@@ -33,11 +35,60 @@ pub fn inv0(x: &Fq) -> Fq {
     }
 }
 
-/// Try to compute sqrt(x³+3) for a given x-coordinate
-/// Returns Some(y) if x is on BN254, None otherwise
+// ============================================================================
+// Field-op wrappers (T3 — BPF stack-frame management)
+// ============================================================================
+// Solana BPF has 4KB per call frame + 8 frames max. ark-ff's Fq multiplication
+// allocates ~200 bytes internally; 10+ inlined Fq ops in map_to_point blew the
+// 4KB frame (measured 5520 bytes pre-fix). `#[inline(never)]` wrappers force
+// each op into its own frame so intermediates don't accumulate in the caller.
+// See ~/vault/80-learnings/2026-04-16-bpf-stack-frame-management.md.
+
+#[inline(never)]
+fn fq_mul(a: &Fq, b: &Fq) -> Fq { *a * *b }
+
+#[inline(never)]
+fn fq_sq(a: &Fq) -> Fq { a.square() }
+
+#[inline(never)]
+fn fq_add(a: &Fq, b: &Fq) -> Fq { *a + *b }
+
+#[inline(never)]
+fn fq_sub(a: &Fq, b: &Fq) -> Fq { *a - *b }
+
+// ============================================================================
+// SVDW sqrt oracle — cfg-gated per ADR 0037
+// ============================================================================
+// Native: ark-ff Fq::sqrt() via Tonelli–Shanks.
+// BPF:    alt_bn128_g1_decompress as sqrt oracle (643 CU, Phase 1.1 validated
+//         at commit 57aeb8b). Input = 32 BE bytes with sign bit cleared (x < p
+//         so byte[0] < 0x30 → MSB already 0, encoding = "positive y"). Output
+//         = 64 BE bytes (x || y). Err ⇒ x is not on curve (gx is not a QR) —
+//         SVDW falls through to next x-candidate. Sign correction is applied
+//         by the caller (map_to_point) regardless of which y was returned.
+
+#[cfg(not(target_os = "solana"))]
 fn try_sqrt_curve(x: &Fq) -> Option<Fq> {
-    let gx = x.square() * x + B; // x³ + 3
+    let gx = fq_add(&fq_mul(&fq_sq(x), x), &B); // x³ + 3
     gx.sqrt()
+}
+
+#[cfg(target_os = "solana")]
+fn try_sqrt_curve(x: &Fq) -> Option<Fq> {
+    use anchor_lang::solana_program::alt_bn128::compression::prelude::alt_bn128_g1_decompress;
+
+    // x is guaranteed < p, so byte[0] < 0x30 → MSB (sign bit) is already 0
+    // (= "positive y" convention in ark_serialize's BN254 compressed form).
+    let x_bytes = fq_to_be_bytes(x);
+    match alt_bn128_g1_decompress(&x_bytes) {
+        Ok(point64) => {
+            // point64[32..64] = y in BE
+            let mut y_bytes = [0u8; 32];
+            y_bytes.copy_from_slice(&point64[32..64]);
+            Some(fq_from_be_bytes(&y_bytes))
+        }
+        Err(_) => None, // x is not on curve (gx is not a QR in Fq)
+    }
 }
 
 /// SVDW map_to_point: maps a field element to a BN254 G1 point
@@ -45,24 +96,24 @@ fn try_sqrt_curve(x: &Fq) -> Option<Fq> {
 /// Returns 64 big-endian bytes (x || y)
 pub fn map_to_point(u: &Fq) -> [u8; 64] {
     // Steps 1-4: compute tv1, tv2
-    let tv1_inner = u.square() * C1; // u² * g(Z)
-    let tv2 = Fq::ONE + tv1_inner;   // 1 + u²*g(Z)
-    let tv1 = Fq::ONE - tv1_inner;   // 1 - u²*g(Z)
+    let tv1_inner = fq_mul(&fq_sq(u), &C1); // u² * g(Z)
+    let tv2 = fq_add(&Fq::ONE, &tv1_inner); // 1 + u²*g(Z)
+    let tv1 = fq_sub(&Fq::ONE, &tv1_inner); // 1 - u²*g(Z)
 
     // Steps 5-6: tv3 = inv0(tv1 * tv2)
-    let tv3 = inv0(&(tv1 * tv2));
+    let tv3 = inv0(&fq_mul(&tv1, &tv2));
 
     // Step 7: tv5 = u * tv1 * tv3 * C3
-    let tv5 = *u * tv1 * tv3 * C3;
+    let tv5 = fq_mul(&fq_mul(&fq_mul(u, &tv1), &tv3), &C3);
 
     // Steps 8-9: candidates x1, x2
-    let x1 = C2 - tv5;
-    let x2 = C2 + tv5;
+    let x1 = fq_sub(&C2, &tv5);
+    let x2 = fq_add(&C2, &tv5);
 
     // Steps 10-12: candidate x3
-    let tv7 = tv2.square();
-    let tv8 = tv7 * tv3;
-    let x3 = Z + C4 * tv8.square();
+    let tv7 = fq_sq(&tv2);
+    let tv8 = fq_mul(&tv7, &tv3);
+    let x3 = fq_add(&Z, &fq_mul(&C4, &fq_sq(&tv8)));
 
     // Select candidate: try x1, then x2, then x3
     let (selected_x, mut y) = if let Some(y1) = try_sqrt_curve(&x1) {
@@ -86,7 +137,13 @@ pub fn map_to_point(u: &Fq) -> [u8; 64] {
     result
 }
 
-/// G1 point addition using ark-ec (native fallback)
+// ============================================================================
+// G1 addition — cfg-gated
+// ============================================================================
+// Native: ark-ec affine addition (for tests).
+// BPF:    alt_bn128_addition syscall (334 CU).
+
+#[cfg(not(target_os = "solana"))]
 pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> [u8; 64] {
     use ark_bn254::G1Affine;
     let x1 = fq_from_be_bytes(p1[0..32].try_into().unwrap());
@@ -103,6 +160,21 @@ pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> [u8; 64] {
     result[0..32].copy_from_slice(&fq_to_be_bytes(&sum.x));
     result[32..64].copy_from_slice(&fq_to_be_bytes(&sum.y));
     result
+}
+
+#[cfg(target_os = "solana")]
+pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> [u8; 64] {
+    use anchor_lang::solana_program::alt_bn128::prelude::alt_bn128_addition;
+
+    let mut input = [0u8; 128];
+    input[0..64].copy_from_slice(p1);
+    input[64..128].copy_from_slice(p2);
+
+    let result = alt_bn128_addition(&input)
+        .expect("alt_bn128_addition: inputs already validated as on-curve G1");
+    let mut out = [0u8; 64];
+    out.copy_from_slice(&result[..64]);
+    out
 }
 
 #[cfg(test)]
