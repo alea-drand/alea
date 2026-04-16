@@ -63,26 +63,23 @@ pub mod alea_verifier {
     }
 
     pub fn probe_optimized(_ctx: Context<ProbeOptimized>) -> Result<()> {
-        // Simulate a SINGLE map_to_point with sqrt-and-check optimization
         let u = Fq::from(42u64);
-
-        msg!("=== sqrt_and_check #1 (simulating first candidate) ===");
-        sol_log_compute_units();
         let gx1 = u * u * u + Fq::from(3u64);
-        let s1 = gx1.pow(SQRT_EXP);
-        let is_qr1 = s1 * s1 == gx1;
-        sol_log_compute_units();
-        msg!("check1 done, is_qr={}", is_qr1);
 
-        msg!("=== sqrt_and_check #2 (simulating second candidate) ===");
+        // GENERIC pow (baseline)
+        msg!("=== GENERIC pow sqrt (baseline) ===");
         sol_log_compute_units();
-        let gx2 = (u + Fq::from(1u64)).pow([3u64, 0, 0, 0]) + Fq::from(3u64);
-        let s2 = gx2.pow(SQRT_EXP);
-        let is_qr2 = s2 * s2 == gx2;
+        let s_generic = gx1.pow(SQRT_EXP);
+        let _check_generic = s_generic * s_generic == gx1;
         sol_log_compute_units();
-        msg!("check2 done, is_qr={}", is_qr2);
+        msg!("generic done");
 
-        msg!("=== total for simulated map_to_point (2 candidates) ===");
+        // ADDITION CHAIN sqrt (optimized)
+        msg!("=== ADDITION CHAIN sqrt (optimized) ===");
+        sol_log_compute_units();
+        let result = crypto::optimized_exp::sqrt_and_check(&gx1);
+        sol_log_compute_units();
+        msg!("chain done, is_some={}", result.is_some());
 
         Ok(())
     }
