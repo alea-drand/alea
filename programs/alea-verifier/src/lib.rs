@@ -2,7 +2,7 @@
 
 use anchor_lang::prelude::*;
 
-declare_id!("FHhKqaQ6k993teCkDrHcXjbpkA4efa7zizuoJcacndNT");
+declare_id!("ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U");
 
 pub mod crypto;
 pub mod errors;
