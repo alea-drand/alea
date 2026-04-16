@@ -1,5 +1,11 @@
-# Solana build artifacts
-target/
+# Solana build artifacts — ignore everything under target/ EXCEPT the
+# hand-written IDL, which must be committed (Anchor 0.30.1 proc-macro2
+# incompat prevents auto-gen; see ~/vault/80-learnings/2026-04-16-
+# anchor-030-proc-macro2-incompatibility.md).
+target/*
+!target/idl
+target/idl/*
+!target/idl/alea_verifier.json
 .anchor/
 node_modules/
 test-ledger/
