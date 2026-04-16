@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# T1.13 — release MUST be gated on a passing test job. crates.io NEVER removes
+# versions that other crates depend on; npm CAN remove but only within 72h. A
+# broken release published to either registry is unrecoverable for downstream
+# consumers. The `test` job below MUST pass before any publish step runs.
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.79.0"  # TBD — update post Phase 1.1.A (matches release job)
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v2.2.0/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor via AVM (pinned =0.30.1)
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install 0.30.1
+          avm use 0.30.1
+          anchor --version | grep "0.30.1"
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Run anchor test (program + integration)
+        run: anchor test
+
+      - name: Run TypeScript SDK tests
+        working-directory: sdk/typescript
+        run: |
+          npm ci
+          npm test
+
+      - name: Verify fixtures (T2.U)
+        working-directory: build-spec/testing/scripts
+        run: |
+          npm ci
+          node --experimental-strip-types verify-fixtures.ts
+
+  release:
+    needs: [test]   # T1.13 — gate publish on passing tests; tag pushes cannot publish on test failure
+    runs-on: ubuntu-latest
+    # Only the deployer / multisig cosigner can trigger (gated by tag push).
+    # CI runs on tag; humans still sign cargo/npm publishes via trusted tokens.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # NOTE (T2.32): coral-xyz/anchor-action does NOT exist (verified 2026-04-14
+      # via GitHub API — repo returns 404). Use manual solana-install + avm pattern.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          # Reads rust-toolchain.toml automatically — but rust-toolchain.toml
+          # channel is TBD until Phase 1.1.A. Hardcode here temporarily; swap
+          # to reading toolchain file once pinned.
+          toolchain: "1.79.0"  # TBD — update post Phase 1.1.A
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v2.2.0/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor via AVM (pinned =0.30.1)
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install 0.30.1
+          avm use 0.30.1
+          anchor --version | grep "0.30.1"
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Build Anchor program (verifiable)
+        run: anchor build --verifiable
+
+      - name: Copy IDL to SDK (T2.05 — IDL bundling)
+        run: |
+          mkdir -p sdk/typescript/src/idl
+          cp target/idl/alea_verifier.json sdk/typescript/src/idl/alea_verifier.json
+          test -f sdk/typescript/src/idl/alea_verifier.json || { echo "IDL missing"; exit 1; }
+
+      - name: Build TypeScript SDK
+        working-directory: sdk/typescript
+        run: |
+          npm install
+          npm run build
+          test -f dist/idl/alea_verifier.json || { echo "IDL not bundled in dist"; exit 1; }
+
+      - name: Publish alea-verifier to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          # Publish order matters: alea-verifier first (the program crate),
+          # alea-sdk second (the CPI crate depending on alea-verifier).
+          cargo publish -p alea-verifier
+
+      - name: Wait for crates.io index propagation
+        run: sleep 60
+
+      - name: Publish alea-sdk to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p alea-sdk
+
+      - name: Publish @alea/sdk to npm
+        working-directory: sdk/typescript
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --access public
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # T2.CC — `generate_release_notes: true` removed. We rely solely on
+          # body_path: CHANGELOG.md as the single source of release-note truth.
+          # Keeping both produced doubled release text (auto-generated bullet
+          # list followed by curated CHANGELOG content). CHANGELOG.md is the
+          # canonical changelog per ADR 0028 versioning policy; release notes
+          # mirror that, not GitHub's auto-summary.
+          body_path: CHANGELOG.md
+          files: |
+            target/verifiable/alea_verifier.so
+            target/idl/alea_verifier.json

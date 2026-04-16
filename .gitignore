@@ -1,0 +1,31 @@
+# Solana build artifacts
+target/
+.anchor/
+node_modules/
+test-ledger/
+
+# Keys — NEVER commit
+*.json.bak
+*-keypair.json
+deployer*.json
+target/deploy/*.json
+
+# Build spec (private)
+build-spec/
+
+# Claude Code (local config)
+.claude/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Environment
+.env
+.env.*
+
+# Monitoring (private)
+scripts/collect-metrics.ts

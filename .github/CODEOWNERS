@@ -1,0 +1,15 @@
+# CODEOWNERS for github.com/alea-drand/alea
+# Auto-assigns review on every PR. Until the multisig transition (ADR 0009),
+# Aaron is the sole maintainer. After transition, the three multisig signers
+# have review authority.
+
+# Global ownership: everything
+* @aaronisafk
+
+# Security-critical code: future multisig co-signers (placeholders until identified
+# per OPEN-ITEMS.md #6 — Randamu contact + SF Foundation contact). Uncomment + replace
+# the placeholders once the multisig ceremony lands and the co-signer GitHub handles
+# are confirmed.
+# /programs/alea-verifier/     @aaronisafk @co-signer-1 @co-signer-2
+# /build-spec/decisions/       @aaronisafk @co-signer-1 @co-signer-2
+# /.github/SECURITY.md         @aaronisafk @co-signer-1 @co-signer-2

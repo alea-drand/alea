@@ -1,0 +1,16 @@
+{
+  "name": "alea",
+  "private": true,
+  "workspaces": ["sdk/typescript"],
+  "scripts": {
+    "test": "anchor test",
+    "build": "anchor build",
+    "generate-vectors": "cd build-spec/testing/scripts && node --experimental-strip-types generate-test-vectors.ts"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "=0.30.1",
+    "@solana/web3.js": "^1.95",
+    "typescript": "^5.0",
+    "chai": "^4.3"
+  }
+}
