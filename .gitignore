@@ -36,3 +36,7 @@ build-spec/
 
 # Monitoring (private)
 scripts/collect-metrics.ts
+
+# Raw CU benchmark data — regeneratable via anchor test. validation-report.md
+# summarizes the stats; per-round data doesn't need to bloat the repo.
+validation-report-phase2-cu.json

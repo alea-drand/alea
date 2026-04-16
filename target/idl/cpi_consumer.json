@@ -9,7 +9,16 @@
   "instructions": [
     {
       "name": "consume_randomness",
-      "discriminator": [190, 217, 49, 162, 99, 26, 73, 234],
+      "discriminator": [
+        190,
+        217,
+        49,
+        162,
+        99,
+        26,
+        73,
+        234
+      ],
       "accounts": [
         {
           "name": "alea_program",
@@ -19,7 +28,17 @@
           "name": "alea_config",
           "pda": {
             "seeds": [
-              { "kind": "const", "value": [99, 111, 110, 102, 105, 103] }
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
             ],
             "program": {
               "kind": "account",
@@ -33,10 +52,26 @@
         }
       ],
       "args": [
-        { "name": "round",     "type": "u64" },
-        { "name": "signature", "type": { "array": ["u8", 64] } }
+        {
+          "name": "round",
+          "type": "u64"
+        },
+        {
+          "name": "signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        }
       ],
-      "returns": { "array": ["u8", 32] }
+      "returns": {
+        "array": [
+          "u8",
+          32
+        ]
+      }
     }
   ]
 }

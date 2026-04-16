@@ -106,3 +106,69 @@ Using Solution A (G1 decompress) for sqrt + syscalls for pairing:
 No existing Solana project uses G1 decompression as a sqrt oracle.
 
 **New ADR needed** to document the syscall-based SVDW architecture decision.
+
+---
+
+## Phase 2 — Localnet Integration + CU Benchmark (2026-04-16)
+
+**Result:** PASS — Gate C cleared. Full on-chain verification confirmed.
+
+### Test Results
+
+| Category | Tests | Pass |
+|----------|-------|------|
+| initialize | 4 P0 | 4/4 |
+| verify | 5 P0 + 1 P1 | 6/6 |
+| update_config | 2 P0 | 2/2 |
+| CPI (cpi-consumer) | 1 P0 + 1 P1 | 2/2 |
+| CU benchmark (50 rounds) | 1 P1 | 1/1 |
+| **Total** | **12 P0 + 3 P1** | **15/15** |
+
+### CU Distribution (50 consecutive live drand rounds, evmnet)
+
+Measured on `anchor test` localnet. `verify` instruction, stored-bump
+config PDA, preInstructions `ComputeBudgetInstruction::set_compute_unit_limit(1_400_000)`:
+
+| Metric | CU |
+|--------|----:|
+| min    | 404,275 |
+| p50    | 407,690 |
+| mean   | 407,881 |
+| p95    | 412,605 |
+| p99    | 415,379 |
+| max    | 415,379 |
+| stddev | 2,404   |
+| variance (% of mean) | 0.59% |
+
+**Acceptance criteria:**
+- AC-16: max CU < 1,000,000 → PASS (max 415,379, 41.5% of ceiling)
+- AC-17: variance < 20% of mean → PASS (variance 0.59%)
+
+**vs. ADR 0037 prediction (~80-100K CU):** actual 4-5× higher. The
+estimate under-counted the cost of remaining ark-ff field ops (SVDW
+tv arithmetic, on_curve_g1 check) on BPF. Still well under the 1M
+gate and leaves ~984K CU headroom under Solana's 1.4M per-tx ceiling
+for consumer logic with the SDK's 900K default.
+
+**Binary sizes (BPF release):**
+- `alea_verifier.so`: 295,320 bytes (288 KB) — in 100-600 KB spec band
+- `cpi_consumer.so`: 191,952 bytes (187 KB) — test fixture only
+
+**Notable empirical confirmations:**
+- ADR 0030 CPI return data: **Pattern A** (Anchor 0.30.x auto-serialize
+  of `Result<[u8; 32]>`). `cpi-consumer` successfully reads the 32-byte
+  randomness via `alea_verifier::cpi::verify(...)?.get()`. OPEN-ITEMS #3 resolved.
+- ADR 0034 `seeds::program` constraint: works. Wrong config PDA derived
+  from cpi-consumer's own ID is rejected at the constraint layer
+  (Anchor 2xxx), not the custom 6xxx range.
+- Error code tri-state handling: 6000 (InvalidSignature on wrong round
+  sig), 6001 (InvalidG1Point on non-canonical x=p), 6002 (RoundZero),
+  and Anchor 2001 (ConstraintHasOne on wrong authority) all fire as
+  specified in `program/spec.md §Error Codes`.
+
+**Gate C cleared.** Phase 2 complete. Full on-chain drand BN254 BLS
+verification proven on Solana localnet. Ready for Phase 3 devnet deploy.
+
+Raw per-round CU data: `validation-report-phase2-cu.json` (50 rounds,
+not committed to avoid growing the repo — regenerate with
+`anchor test --skip-build`).
