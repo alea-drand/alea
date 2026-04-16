@@ -26,5 +26,7 @@ ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
 ark-serialize = { workspace = true }
 
-
+[dev-dependencies]
+hex-literal = "0.4"
+hex = "0.4"
 
