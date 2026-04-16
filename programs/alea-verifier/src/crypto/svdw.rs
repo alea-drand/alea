@@ -191,4 +191,84 @@ mod tests {
         assert_eq!(m_y_hex, "2bf29ab3af54dfe3c053ad4efa93db05d3586368463e9d7334c7ba61f6f4e955",
             "Round 9337227 M.y must match fixture");
     }
+
+    #[test]
+    fn map_to_point_u_zero() {
+        let u = Fq::ZERO;
+        let result = map_to_point(&u);
+        // Must produce a valid G1 point without panic
+        let x = fq_from_be_bytes(result[0..32].try_into().unwrap());
+        let y = fq_from_be_bytes(result[32..64].try_into().unwrap());
+        assert_eq!(y.square(), x.square() * x + Fq::from(3u64), "u=0 result must be on curve");
+    }
+
+    #[test]
+    fn map_to_point_u_one() {
+        let u = Fq::ONE;
+        let result = map_to_point(&u);
+        let x = fq_from_be_bytes(result[0..32].try_into().unwrap());
+        let y = fq_from_be_bytes(result[32..64].try_into().unwrap());
+        assert_eq!(y.square(), x.square() * x + Fq::from(3u64), "u=1 result must be on curve");
+    }
+
+    #[test]
+    fn map_to_point_u_p_minus_1() {
+        let u = -Fq::ONE; // p-1
+        let result = map_to_point(&u);
+        let x = fq_from_be_bytes(result[0..32].try_into().unwrap());
+        let y = fq_from_be_bytes(result[32..64].try_into().unwrap());
+        assert_eq!(y.square(), x.square() * x + Fq::from(3u64), "u=p-1 result must be on curve");
+    }
+
+    #[test]
+    fn all_svdw_branches_exercised() {
+        // Scan first 200 rounds to find inputs that exercise each x-candidate branch
+        use anchor_lang::solana_program::keccak;
+        use super::super::expand_message::hash_to_field;
+
+        let mut hit_x1 = false;
+        let mut hit_x2 = false;
+        let mut hit_x3 = false;
+
+        for round in 1..=200u64 {
+            let round_bytes = round.to_be_bytes();
+            let msg = keccak::hash(&round_bytes);
+            let (u0, u1) = hash_to_field(msg.as_ref());
+
+            for u in [u0, u1] {
+                let branch = which_branch(&u);
+                match branch {
+                    1 => hit_x1 = true,
+                    2 => hit_x2 = true,
+                    3 => hit_x3 = true,
+                    _ => unreachable!(),
+                }
+            }
+            if hit_x1 && hit_x2 && hit_x3 {
+                break;
+            }
+        }
+        assert!(hit_x1, "x1 branch must be exercised within 200 rounds");
+        assert!(hit_x2, "x2 branch must be exercised within 200 rounds");
+        assert!(hit_x3, "x3 branch must be exercised within 200 rounds");
+    }
+
+    /// Helper: determine which SVDW branch a given u takes
+    fn which_branch(u: &Fq) -> u8 {
+        let tv1_inner = u.square() * C1;
+        let tv2 = Fq::ONE + tv1_inner;
+        let tv1 = Fq::ONE - tv1_inner;
+        let tv3 = inv0(&(tv1 * tv2));
+        let tv5 = *u * tv1 * tv3 * C3;
+        let x1 = C2 - tv5;
+        let x2 = C2 + tv5;
+
+        let gx1 = x1.square() * x1 + B;
+        if gx1.sqrt().is_some() { return 1; }
+
+        let gx2 = x2.square() * x2 + B;
+        if gx2.sqrt().is_some() { return 2; }
+
+        3
+    }
 }
