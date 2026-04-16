@@ -37,3 +37,72 @@
 - OPEN-ITEMS #1: resolved — `ark-ff = "=0.5.0"`
 - OPEN-ITEMS #2: resolved — `channel = "stable"` (Rust 1.94.1)
 - Attempts 2, 3, 4 NOT needed
+
+---
+
+## Phase 1.1.B — G2 Subgroup Check (2026-04-16)
+
+**Result:** FAIL — Primary path exceeds 1.4M CU. Ship fallback (hardcoded const).
+
+**Test:** `G2Affine::is_in_correct_subgroup_assuming_on_curve()` on BPF localnet.
+**CU consumed:** >1,400,000 (hit transaction limit, did not complete)
+
+**Decision impact:**
+- ADR 0027: resolved — ship **fallback path** (hardcoded `EXPECTED_EVMNET_G2_PUBKEY` const comparison)
+- Error code 6008 `WrongPubkey` is ACTIVE (not 6005 `InvalidG2Point`)
+- Key rotation requires program upgrade (not `update_config`)
+- OPEN-ITEMS #4: resolved — fallback path
+
+---
+
+## Phase 1.1.D — CU Benchmark (2026-04-16)
+
+**Result:** PASS — CU measured for all field operations + 3 optimization strategies
+
+### Pure BPF (ark-ff 0.5.0 generic)
+| Operation | CU | Method |
+|-----------|-----|--------|
+| `Fq::pow` (p-1)/2 | 679,173 | generic square-and-multiply |
+| `Fq::sqrt` (p+1)/4 | 676,554 | generic square-and-multiply |
+| `Fq::inverse` | 25,511 | ark-ff internal (Binary GCD) |
+
+### Optimized Approaches (head-to-head comparison)
+| Solution | sqrt CU | Non-QR detect CU | Method |
+|----------|---------|-------------------|--------|
+| **A: G1 decompress syscall** | **643** | **626** | `alt_bn128_g1_decompress` — computes sqrt(x³+3) |
+| **B: big_mod_exp syscall** | **996** | N/A | `sol_big_mod_exp(base, (p+1)/4, p)` |
+| **C: Addition chain** | **553,650** | N/A | gnark-crypto 300-op chain, pure BPF |
+
+### Key Findings
+1. **G1 decompression is a sqrt oracle** — undocumented optimization. `alt_bn128_g1_decompress` internally computes sqrt(x³+3) for BN254. Returns `Err` for non-QR inputs. 643 CU vs 677K CU = **1,053x improvement**.
+2. **big_mod_exp syscall works** — computes arbitrary modular exponentiation at 996 CU for 32-byte inputs. 680x cheaper than BPF.
+3. **Addition chain implemented but unnecessary** — 553K CU via gnark-crypto's chain. Superseded by syscall solutions.
+
+### Estimated Full SVDW Pipeline
+Using Solution A (G1 decompress) for sqrt + syscalls for pairing:
+- expand_message_xmd + hash_to_field: ~10K CU
+- 2× map_to_point (field ops + G1 decompress): ~15-30K CU
+- G1 addition (syscall): ~334 CU
+- Pairing check (syscall): ~49K CU
+- sha256 randomness: ~5K CU
+- **Estimated total: ~80-100K CU** (needs full pipeline measurement to confirm)
+
+**Decision impact:**
+- OPEN-ITEMS #5: resolved — CU budget is viable with syscall-based architecture
+- SDK default 900K CU is massive overkill; can likely use 200K CU
+- The entire SVDW architecture shifts from "pure BPF field arithmetic" to "syscall-assisted"
+
+---
+
+## ARCHITECTURE CHANGE: Syscall-Based SVDW (2026-04-16)
+
+**Discovery:** Three Solana syscalls can replace expensive BPF field arithmetic:
+
+1. `alt_bn128_g1_decompress` (643 CU) — replaces `Fq::sqrt` for sqrt(x³+3)
+2. `sol_big_mod_exp` (996 CU) — replaces `Fq::pow` for arbitrary exponents
+3. `alt_bn128_pairing` (49K CU) — already planned for BLS verification
+
+**Impact:** Full drand verify estimated at ~80-100K CU instead of ~1.7M CU.
+No existing Solana project uses G1 decompression as a sqrt oracle.
+
+**New ADR needed** to document the syscall-based SVDW architecture decision.
