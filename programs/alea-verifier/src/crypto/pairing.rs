@@ -1,12 +1,18 @@
 use ark_bn254::Fq;
-use ark_ff::{BigInteger256, Field, PrimeField, Zero};
+use ark_ff::{BigInteger256, Field, PrimeField};
 
-use super::constants::{EXPECTED_EVMNET_PUBKEY, G2_GENERATOR, GT_ONE, P_BE, P_BIGINT};
+use super::constants::{G2_GENERATOR, GT_ONE, P_BIGINT};
+#[cfg(test)]
+use super::constants::EXPECTED_EVMNET_PUBKEY;
 use super::hash_to_g1::hash_round_to_g1;
 use super::svdw::{fq_from_be_bytes, fq_to_be_bytes};
 
-/// Validate that bytes decode to a point on BN254 G1 in canonical form
-/// Rejects: x >= p, y >= p, or y² != x³ + 3 mod p
+/// Validate that bytes decode to a point on BN254 G1 in canonical form.
+///
+/// Rejects: x >= p, y >= p, or y² != x³ + 3 mod p.
+///
+/// Runs on both native and BPF via ark-ff field ops (no ark-ec) — ~5
+/// field operations per call, acceptable CU cost on BPF.
 pub fn on_curve_g1(bytes: &[u8; 64]) -> bool {
     // Parse as big-endian bigints WITHOUT field reduction
     let x_bytes: [u8; 32] = bytes[0..32].try_into().unwrap();
@@ -37,8 +43,23 @@ pub fn negate_g1(point: &[u8; 64]) -> [u8; 64] {
     result
 }
 
-/// Full BLS verification: verify drand beacon and return randomness
-/// Returns 32-byte randomness = sha256(signature) on success, None on failure
+// ============================================================================
+// Pairing check — cfg-gated per ADR 0037 + bls-verification.md T2.B2
+// ============================================================================
+// Public surface: `verify_pairing`.
+// Returns:
+//   Some(true)  = e(σ, G2_gen) · e(-M, pubkey) == 1_GT  (signature valid)
+//   Some(false) = pairing product != 1_GT               (signature invalid)
+//   None        = syscall returned Err (BPF infrastructure failure) —
+//                 caller maps to AleaError::PairingError per T3.09.
+//
+// Buffer order (384 bytes) per `program/bls-verification.md §Byte-Layout`:
+//   σ(64) || G2_gen(128) || neg_m(64) || pubkey(128)
+
+/// Full BLS verification: verify drand beacon and return randomness.
+/// Native test helper — returns `None` on any failure (invalid signature,
+/// off-curve, or pairing infrastructure error). The Anchor `verify`
+/// handler uses the primitives directly so it can emit distinct error codes.
 pub fn verify_beacon(round: u64, signature: &[u8; 64], pubkey_g2: &[u8; 128]) -> Option<[u8; 32]> {
     // Step 1: validate signature is on curve
     if !on_curve_g1(signature) {
@@ -52,24 +73,78 @@ pub fn verify_beacon(round: u64, signature: &[u8; 64], pubkey_g2: &[u8; 128]) ->
     let neg_m = negate_g1(&m);
 
     // Step 4: pairing check e(σ, G2_gen) * e(-M, pubkey) == 1
-    if !pairing_check_native(signature, &G2_GENERATOR, &neg_m, pubkey_g2) {
-        return None;
+    match verify_pairing(signature, &neg_m, pubkey_g2, &G2_GENERATOR) {
+        Some(true) => {
+            // Step 5: randomness = sha256(signature) — NOT keccak256 (ADR 0036)
+            let randomness = anchor_lang::solana_program::hash::hash(signature);
+            Some(randomness.to_bytes())
+        }
+        _ => None, // Some(false) = invalid sig; None = syscall error
     }
-
-    // Step 5: randomness = sha256(signature) — NOT keccak256 (ADR 0036)
-    let randomness = anchor_lang::solana_program::hash::hash(signature);
-    Some(randomness.to_bytes())
 }
 
-/// BN254 pairing check using ark-ec (native)
+/// Cross-platform pairing check.
+///
+/// * Native: ark-ec `Bn254::multi_pairing` (used by `cargo test` — see
+///   `#[cfg(not(target_os = "solana"))]` helper `pairing_check_native`).
+/// * BPF:    Solana `alt_bn128_pairing` syscall (48,485 CU, 2 pairs).
+///
+/// Argument order follows `program/bls-verification.md §"Pairing Check
+/// Details"`: `(sigma, neg_m, pubkey_g2, g2_gen)`. Internally the bytes
+/// are assembled as `σ || G2_gen || -M || pubkey` before the syscall /
+/// native call.
+#[cfg(not(target_os = "solana"))]
+pub fn verify_pairing(
+    sigma: &[u8; 64],
+    neg_m: &[u8; 64],
+    pubkey_g2: &[u8; 128],
+    g2_gen: &[u8; 128],
+) -> Option<bool> {
+    Some(pairing_check_native(sigma, g2_gen, neg_m, pubkey_g2))
+}
+
+#[cfg(target_os = "solana")]
+pub fn verify_pairing(
+    sigma: &[u8; 64],
+    neg_m: &[u8; 64],
+    pubkey_g2: &[u8; 128],
+    g2_gen: &[u8; 128],
+) -> Option<bool> {
+    use anchor_lang::solana_program::alt_bn128::prelude::alt_bn128_pairing;
+
+    let mut input = [0u8; 384];
+    input[0..64].copy_from_slice(sigma);
+    input[64..192].copy_from_slice(g2_gen);
+    input[192..256].copy_from_slice(neg_m);
+    input[256..384].copy_from_slice(pubkey_g2);
+
+    match alt_bn128_pairing(&input) {
+        Ok(result) => {
+            // Compare full 32 bytes against GT_ONE (T2.14 — catches ABI
+            // regressions if Solana ever changes output format).
+            if result.len() == 32 && result[..] == GT_ONE[..] {
+                Some(true)
+            } else {
+                Some(false)
+            }
+        }
+        Err(_) => None, // Infrastructure failure → caller emits PairingError (6006)
+    }
+}
+
+/// Native-only pairing via ark-ec. Not compiled on BPF target — its
+/// `final_exponentiation` internal blows the 4KB stack frame and is
+/// replaced by `alt_bn128_pairing` syscall on BPF (see `verify_pairing`).
+#[cfg(not(target_os = "solana"))]
 fn pairing_check_native(
     sigma: &[u8; 64],
     g2_gen: &[u8; 128],
     neg_m: &[u8; 64],
     pubkey: &[u8; 128],
 ) -> bool {
-    use ark_bn254::{Bn254, G1Affine, G2Affine};
+    use ark_bn254::Bn254;
     use ark_ec::pairing::Pairing;
+    use ark_ff::Zero;
 
     let sig_pt = decode_g1(sigma);
     let m_neg_pt = decode_g1(neg_m);
@@ -84,12 +159,14 @@ fn pairing_check_native(
     result.is_zero()
 }
 
+#[cfg(not(target_os = "solana"))]
 fn decode_g1(bytes: &[u8; 64]) -> ark_bn254::G1Affine {
     let x = fq_from_be_bytes(bytes[0..32].try_into().unwrap());
     let y = fq_from_be_bytes(bytes[32..64].try_into().unwrap());
     ark_bn254::G1Affine::new_unchecked(x, y)
 }
 
+#[cfg(not(target_os = "solana"))]
 fn decode_g2(bytes: &[u8; 128]) -> ark_bn254::G2Affine {
     use ark_bn254::Fq2;
 
