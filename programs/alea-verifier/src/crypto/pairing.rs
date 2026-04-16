@@ -1,7 +1,9 @@
 use ark_bn254::Fq;
 use ark_ff::{BigInteger256, Field, PrimeField};
 
-use super::constants::{G2_GENERATOR, GT_ONE, P_BIGINT};
+use super::constants::{G2_GENERATOR, P_BIGINT};
+#[cfg(target_os = "solana")]
+use super::constants::GT_ONE;
 #[cfg(test)]
 use super::constants::EXPECTED_EVMNET_PUBKEY;
 use super::hash_to_g1::hash_round_to_g1;
