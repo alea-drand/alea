@@ -1,2 +1,3 @@
-pub mod probe_cu;
-pub mod probe_g2;
+pub mod initialize;
+pub mod update_config;
+pub mod verify;
