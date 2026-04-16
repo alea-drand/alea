@@ -1,5 +1,5 @@
 [toolchain]
-anchor_version = "=0.30.1"
+# anchor_version managed via cargo install, not avm
 
 [features]
 resolution = true
@@ -9,10 +9,10 @@ skip-lint = false
 alea_verifier = "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U"
 
 [programs.devnet]
-alea_verifier = "DEVNET_PROGRAM_ID"
+alea_verifier = "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U"
 
 [programs.mainnet]
-alea_verifier = "MAINNET_PROGRAM_ID"
+alea_verifier = "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U"
 
 [registry]
 url = "https://api.apr.dev"
