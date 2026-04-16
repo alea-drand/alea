@@ -1,0 +1,122 @@
+name: IDL Diff (CPI Stability Enforcement)
+
+# T2.DD — enforces ADR 0028's CPI Interface Stability Guarantee at CI level.
+# On every PR: build the Anchor program with the PR's source, dump the IDL,
+# diff against main's IDL. If they differ AND the PR body does NOT carry the
+# explicit `BREAKING-ALLOWED: <ADR>` tag (reserved for major-version bumps per
+# ADR 0028 versioning policy), the job fails and the PR is blocked from merge.
+#
+# Why this is at CI rather than honor-system: ADR 0028 freezes the v1 verify
+# instruction signature, Config account layout, Verify Accounts struct, return
+# data format, and BeaconVerified event schema for the lifetime of the mainnet
+# program ID. A maintainer who edits any of these fields without intending a
+# breaking change ships a silent break for every consumer. Honor-system review
+# (the PR template asks "did you change an instruction signature?") catches the
+# author who knows they're breaking; it does NOT catch the author who breaks
+# accidentally. The IDL diff is mechanical: any change in the IDL is detected.
+#
+# Escape hatch: if a major version bump genuinely DOES intend to ship a new
+# instruction or modify an existing one (per the additive-only rule, this is
+# "new instruction added" — never "existing instruction modified"), the PR
+# body must include exactly:
+#
+#     BREAKING-ALLOWED: ADR-XXXX
+#
+# where ADR-XXXX is the ADR documenting the major-version-bump decision
+# (e.g., a hypothetical `ADR-0040: v2 verify instruction with batch verification`).
+# The grep below recognizes this tag and skips the diff failure.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'programs/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'Anchor.toml'
+
+jobs:
+  idl-diff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history to checkout main below
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.79.0"  # TBD — match release.yml; update post Phase 1.1.A
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v2.2.0/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor via AVM (pinned =0.30.1)
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install 0.30.1
+          avm use 0.30.1
+
+      - name: Build IDL from PR head
+        run: |
+          anchor build --idl target/idl
+          cp target/idl/alea_verifier.json /tmp/idl-pr.json
+
+      - name: Build IDL from main
+        run: |
+          git checkout main
+          anchor build --idl target/idl
+          cp target/idl/alea_verifier.json /tmp/idl-main.json
+          git checkout -
+
+      - name: Compare IDLs
+        id: diff
+        run: |
+          if diff -q /tmp/idl-main.json /tmp/idl-pr.json > /dev/null; then
+            echo "idl_changed=false" >> "$GITHUB_OUTPUT"
+            echo "✅ IDL unchanged. CPI stability preserved."
+          else
+            echo "idl_changed=true" >> "$GITHUB_OUTPUT"
+            echo "⚠️ IDL changed between main and this PR."
+            echo "--- diff (truncated to first 200 lines) ---"
+            diff /tmp/idl-main.json /tmp/idl-pr.json | head -200 || true
+          fi
+
+      - name: Check PR body for BREAKING-ALLOWED override
+        if: steps.diff.outputs.idl_changed == 'true'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Look for: BREAKING-ALLOWED: ADR-NNNN (case-sensitive, exact tag).
+          if echo "$PR_BODY" | grep -qE '^BREAKING-ALLOWED: ADR-[0-9]+$'; then
+            ALLOWED_ADR=$(echo "$PR_BODY" | grep -oE 'BREAKING-ALLOWED: ADR-[0-9]+' | head -1)
+            echo "✅ IDL change explicitly allowed by '$ALLOWED_ADR' tag in PR body."
+            echo "Reviewer MUST verify the named ADR exists, is accepted, and authorizes this exact change."
+            exit 0
+          else
+            echo "❌ IDL changed without BREAKING-ALLOWED tag in PR body."
+            echo ""
+            echo "ADR 0028 (CPI Interface Stability Guarantee) freezes the v1 verify"
+            echo "instruction signature, Config account layout, Verify Accounts struct,"
+            echo "return data format, and BeaconVerified event schema for the lifetime"
+            echo "of the mainnet program ID."
+            echo ""
+            echo "If this PR adds a NEW instruction (additive — allowed under ADR 0028"
+            echo "minor versions): the IDL still changes, so this check fails. To proceed,"
+            echo "add to PR body:"
+            echo ""
+            echo "    BREAKING-ALLOWED: ADR-XXXX"
+            echo ""
+            echo "where ADR-XXXX documents the new-instruction decision."
+            echo ""
+            echo "If this PR modifies an EXISTING instruction (forbidden under ADR 0028):"
+            echo "do not merge. Open a v2 program ID instead — see ADR 0028 §'Decision'."
+            exit 1
+          fi
