@@ -1,85 +1,64 @@
 #![allow(unexpected_cfgs)]
 
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::alt_bn128::compression::prelude::*;
 use anchor_lang::solana_program::log::sol_log_compute_units;
-use ark_bn254::Fq;
-use ark_ff::{AdditiveGroup, Field};
 
 declare_id!("ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U");
 
 pub mod crypto;
 
 #[derive(Accounts)]
-pub struct ProbeCu<'info> {
+pub struct ProbeSyscall<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 }
-
-#[derive(Accounts)]
-pub struct ProbeOptimized<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-}
-
-const SQRT_EXP: [u64; 4] = [
-    0x4F082305B61F3F52,
-    0x65E05AA45A1C72A3,
-    0x6E14116DA0605617,
-    0x0C19139CB84C680A,
-];
 
 #[program]
 pub mod alea_verifier {
     use super::*;
 
-    pub fn probe_cu(_ctx: Context<ProbeCu>) -> Result<()> {
-        let x = Fq::from(42u64);
-        let exp: [u64; 4] = [
-            0x9E10460B6C3E7EA3,
-            0xCBC0B548B438E546,
-            0xDC2822DB40C0AC2E,
-            0x183227397098D014,
-        ];
+    pub fn probe_syscall(_ctx: Context<ProbeSyscall>) -> Result<()> {
+        // Test 1: G1 decompression with a known valid x-coordinate
+        // x = 1 → gx = 1³+3 = 4, sqrt(4) = 2 → valid point (1, 2)
+        let mut x_bytes = [0u8; 32];
+        x_bytes[31] = 1; // x = 1, big-endian
 
-        msg!("=== Fq::pow (p-1)/2 benchmark ===");
+        msg!("=== G1 decompress: x=1 (valid, sqrt(4)=2) ===");
         sol_log_compute_units();
-        let pow_result = x.pow(exp);
+        let result = alt_bn128_g1_decompress(&x_bytes);
         sol_log_compute_units();
-        msg!("pow done, nonzero={}", pow_result != Fq::ZERO);
+        match &result {
+            Ok(point) => {
+                msg!("OK! y[31]={}", point[63]);
+                // y should be 2 (or p-2)
+            }
+            Err(e) => msg!("ERR: {:?}", e),
+        }
 
-        msg!("=== Fq::sqrt benchmark ===");
+        // Test 2: G1 decompression with x=0 → gx = 0³+3 = 3
+        // Is 3 a QR mod p? From research: NO (p ≡ 7 mod 12 → 3 is non-residue)
+        let x_zero = [0u8; 32];
+        msg!("=== G1 decompress: x=0 (3 is non-QR, should fail) ===");
         sol_log_compute_units();
-        let sqrt_result = x.sqrt();
+        let result2 = alt_bn128_g1_decompress(&x_zero);
         sol_log_compute_units();
-        msg!("sqrt done, is_some={}", sqrt_result.is_some());
+        match &result2 {
+            Ok(_) => msg!("OK (unexpected — 0 is identity?)"),
+            Err(e) => msg!("ERR: {:?}", e),
+        }
 
-        msg!("=== Fq::inverse benchmark ===");
+        // Test 3: x=4 → gx = 64+3 = 67. 67 is NON-QR mod p (verified via Python)
+        let mut x4_bytes = [0u8; 32];
+        x4_bytes[31] = 4;
+        msg!("=== G1 decompress: x=4 (gx=67, NON-QR — should fail) ===");
         sol_log_compute_units();
-        let inv_result = x.inverse();
+        let result3 = alt_bn128_g1_decompress(&x4_bytes);
         sol_log_compute_units();
-        msg!("inverse done, is_some={}", inv_result.is_some());
-
-        Ok(())
-    }
-
-    pub fn probe_optimized(_ctx: Context<ProbeOptimized>) -> Result<()> {
-        let u = Fq::from(42u64);
-        let gx1 = u * u * u + Fq::from(3u64);
-
-        // GENERIC pow (baseline)
-        msg!("=== GENERIC pow sqrt (baseline) ===");
-        sol_log_compute_units();
-        let s_generic = gx1.pow(SQRT_EXP);
-        let _check_generic = s_generic * s_generic == gx1;
-        sol_log_compute_units();
-        msg!("generic done");
-
-        // ADDITION CHAIN sqrt (optimized)
-        msg!("=== ADDITION CHAIN sqrt (optimized) ===");
-        sol_log_compute_units();
-        let result = crypto::optimized_exp::sqrt_and_check(&gx1);
-        sol_log_compute_units();
-        msg!("chain done, is_some={}", result.is_some());
+        match &result3 {
+            Ok(_) => msg!("OK (UNEXPECTED — 67 should be non-QR!)"),
+            Err(e) => msg!("ERR: {:?} (CORRECT — 67 is non-QR)", e),
+        }
 
         Ok(())
     }
