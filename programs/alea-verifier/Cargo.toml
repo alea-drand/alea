@@ -30,8 +30,5 @@ anchor-lang = { workspace = true }
 # hex-literal = "=0.4.1"
 # once_cell = { version = "1", default-features = false }
 
-[profile.release]
-overflow-checks = true
-lto = "fat"
-codegen-units = 1
-strip = true
+
+
