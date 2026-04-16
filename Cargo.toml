@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "programs/alea-verifier",
+    "programs/cpi-consumer",
     "sdk/rust",
 ]
 resolver = "2"

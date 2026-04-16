@@ -6,6 +6,7 @@ target/*
 !target/idl
 target/idl/*
 !target/idl/alea_verifier.json
+!target/idl/cpi_consumer.json
 .anchor/
 node_modules/
 test-ledger/
