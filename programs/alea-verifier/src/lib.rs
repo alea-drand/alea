@@ -14,6 +14,10 @@ pub use instructions::initialize::*;
 pub use instructions::update_config::*;
 pub use instructions::verify::*;
 
+// T1.04 — map_to_point_debug always re-exported (see instructions/mod.rs
+// SECURITY POSTURE for why this is always-on and safe).
+pub use instructions::map_to_point_debug::*;
+
 #[program]
 pub mod alea_verifier {
     use super::*;
@@ -44,5 +48,15 @@ pub mod alea_verifier {
         chain_hash: [u8; 32],
     ) -> Result<()> {
         update_config_handler(ctx, pubkey_g2, genesis_time, period, chain_hash)
+    }
+
+    // T1.04 — BPF-vs-native map_to_point parity debug instruction.
+    // Always present in the shipped binary; stateless pure function with
+    // zero attack surface. See `instructions/mod.rs` SECURITY POSTURE.
+    pub fn map_to_point_debug(
+        ctx: Context<MapToPointDebug>,
+        u_bytes: [u8; 32],
+    ) -> Result<[u8; 64]> {
+        map_to_point_debug_handler(ctx, u_bytes)
     }
 }

@@ -204,6 +204,42 @@
           }
         }
       ]
+    },
+    {
+      "name": "map_to_point_debug",
+      "discriminator": [
+        255,
+        36,
+        214,
+        128,
+        112,
+        18,
+        221,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "u_bytes",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "array": [
+          "u8",
+          64
+        ]
+      }
     }
   ],
   "accounts": [
@@ -299,6 +335,16 @@
       "code": 6009,
       "name": "ReturnDataMissing",
       "msg": "CPI consumer: get_return_data returned None (program upgrade mismatch?)"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidGenesisTime",
+      "msg": "genesis_time does not match EXPECTED_EVMNET_GENESIS_TIME"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidPeriod",
+      "msg": "period does not match EXPECTED_EVMNET_PERIOD"
     }
   ],
   "types": [
