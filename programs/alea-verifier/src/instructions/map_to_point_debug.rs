@@ -33,8 +33,13 @@ use crate::errors::AleaError;
 /// signer for tx fees; no PDAs, no config, no side effects.
 #[derive(Accounts)]
 pub struct MapToPointDebug<'info> {
-    /// Signer pays fees. No authorization required — debug instruction
-    /// is compile-time gated by `diff-test` feature, not run-time.
+    /// Signer pays fees. No authorization required — the instruction is
+    /// a stateless pure function (see module-level SECURITY POSTURE for
+    /// full rationale). Codex-D POST-T3.01: prior comment here incorrectly
+    /// said "compile-time gated by `diff-test` feature"; that design was
+    /// abandoned due to Anchor 0.30.1's #[program] cfg limitation (see
+    /// instructions/mod.rs). The instruction is intentionally always-
+    /// present with documented zero attack surface.
     pub payer: Signer<'info>,
 }
 
