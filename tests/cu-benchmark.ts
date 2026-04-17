@@ -212,6 +212,17 @@ describe("Wave 11 — CU Benchmark (BREAKTHROUGH GATE)", () => {
     expect(s.max, `AC-16: max CU must be < 1,000,000 (got ${s.max})`).to.be.lt(
       1_000_000,
     );
+
+    // T2.G — AC-16b: max CU must be < 900K (SDK default budget boundary
+    // per T2.A). The 1M gate above is a catastrophic-regression hard stop;
+    // the 900K gate is the operational ceiling that matters for consumers
+    // using the alea-sdk's auto-injected ComputeBudgetInstruction. Source:
+    // P10-T2-06 (Sonnet test coverage).
+    expect(
+      s.max,
+      `AC-16b: max CU must be < 900,000 (SDK default budget boundary; got ${s.max})`,
+    ).to.be.lt(900_000);
+
     expect(
       s.variancePctOfMean,
       `AC-17: CU variance must be < 20%% of mean (got ${s.variancePctOfMean.toFixed(2)}%%)`,
