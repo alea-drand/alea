@@ -1,12 +1,11 @@
 use ark_bn254::Fq;
 use ark_ff::{BigInteger256, Field, PrimeField};
 
-use super::constants::P_BIGINT;
+use super::constants::{G2_GENERATOR, P_BIGINT};
 #[cfg(target_os = "solana")]
 use super::constants::GT_ONE;
 #[cfg(test)]
-use super::constants::{EXPECTED_EVMNET_PUBKEY, G2_GENERATOR};
-#[cfg(test)]
+use super::constants::EXPECTED_EVMNET_PUBKEY;
 use super::hash_to_g1::hash_round_to_g1;
 use super::svdw::{fq_from_be_bytes, fq_to_be_bytes};
 
@@ -78,15 +77,23 @@ pub fn negate_g1(point: &[u8; 64]) -> [u8; 64] {
 
 /// Full BLS verification: verify drand beacon and return randomness.
 ///
-/// T2.O — marked `#[cfg(test)]` so this helper cannot be accidentally
-/// called from production code. The Anchor `verify` handler uses the
-/// primitives directly so it can emit distinct error codes (6000/6001/
-/// 6006) instead of collapsing all failures into `None`.
+/// **NOT FOR PRODUCTION USE.** This is a test/fuzz helper that collapses
+/// all failure modes into `None` (invalid sig, off-curve, pairing infra
+/// error). The Anchor `verify_handler` (see `instructions/verify.rs`)
+/// uses the primitives directly and emits distinct error codes
+/// (6000 InvalidSignature / 6001 InvalidG1Point / 6006 PairingError).
+///
+/// This helper exists for:
+///   - Native Rust unit tests (round fixtures, corrupt-sig rejection)
+///   - cargo-fuzz `verify_beacon` target (any-input crash detection)
+///
+/// T2.O partially applied: cannot be `#[cfg(test)]` because the
+/// fuzz crate depends on it. Doc comment strengthened instead, plus
+/// `#[doc(hidden)]` hints at non-public API status.
 ///
 /// T1.05 — hash_round_to_g1 now returns Result; we convert Err to None
-/// here to preserve the test-helper's documented "None on any failure"
-/// behavior.
-#[cfg(test)]
+/// here to preserve the documented "None on any failure" behavior.
+#[doc(hidden)]
 pub fn verify_beacon(round: u64, signature: &[u8; 64], pubkey_g2: &[u8; 128]) -> Option<[u8; 32]> {
     // Step 1: validate signature is on curve
     if !on_curve_g1(signature) {

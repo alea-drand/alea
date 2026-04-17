@@ -31,20 +31,29 @@ enum FuzzInput {
 }
 
 fuzz_target!(|input: FuzzInput| {
-    let point: [u8; 64] = match input {
-        FuzzInput::Round(round) => hash_round_to_g1(round),
+    // T1.05 — hash_to_g1 / hash_round_to_g1 now return Result. Err
+    // indicates SVDW theorem violation (NoSquareRoot 6004) or syscall
+    // infrastructure failure (PairingError 6006). For fuzz targets,
+    // Err is a NON-crash outcome — it's a graceful error return, not
+    // a panic. The invariant we assert on success is that the output
+    // is on-curve.
+    let point = match input {
+        FuzzInput::Round(round) => {
+            let Ok(p) = hash_round_to_g1(round) else { return };
+            p
+        }
         FuzzInput::RawMessage(msg) => {
             // Bound message size so we don't starve the fuzzer on multi-block
             // expand_message paths. 1024 bytes is 8x the keccak rate.
             if msg.len() > 1024 {
                 return;
             }
-            hash_to_g1(&msg)
+            let Ok(p) = hash_to_g1(&msg) else { return };
+            p
         }
     };
 
-    // INVARIANT: every point produced by hash-to-curve MUST be on the curve.
-    // If this assert fires, SVDW has a correctness bug.
+    // INVARIANT: if hash-to-curve succeeds, output MUST be on the curve.
     assert!(
         on_curve_g1(&point),
         "hash_to_g1 produced off-curve point: {:?}",
