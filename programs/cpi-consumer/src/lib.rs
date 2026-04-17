@@ -10,6 +10,7 @@ use anchor_lang::prelude::*;
 use alea_verifier::{
     cpi::{accounts::Verify as AleaVerifyAccounts, verify as alea_verify},
     program::AleaVerifier,
+    state::Config as AleaConfig,
 };
 
 declare_id!("CjG5jdi4unFM2QJ1Z46kB58fHpGbtiEj2m8PmEyPSKvj");
@@ -45,17 +46,25 @@ pub struct ConsumeRandomness<'info> {
     /// (enforced by Anchor's `Program` type using `alea_verifier::ID`).
     pub alea_program: Program<'info, AleaVerifier>,
 
-    /// Alea config PDA. `seeds::program` constraint (ADR 0034) ensures
-    /// the PDA is derived from the Alea program ID — not from cpi-consumer's
-    /// own ID or some other program. This is the consumer-side guard against
-    /// substitution attacks.
-    /// CHECK: deserialized by alea_verifier during CPI.
+    /// Alea config PDA.
+    ///
+    /// T2.B — typed as `Account<'info, AleaConfig>` so Anchor performs
+    /// discriminator + owner validation on the consumer side (belt-and-
+    /// suspenders over `seeds::program`). Previously `UncheckedAccount`,
+    /// which relied 100% on `seeds::program` — if a consumer copied this
+    /// fixture and omitted `seeds::program`, they had zero protection.
+    /// Now the type system catches substitution attempts at deserialization
+    /// even if `seeds::program` is stripped.
+    ///
+    /// `seeds::program = alea_program.key()` is still the primary defense
+    /// per ADR 0034 (mandatory for all CPI consumers). Both layers together
+    /// = defense-in-depth. Sources: P07-T2-02, P08-T3-01.
     #[account(
         seeds = [b"config"],
         bump,
         seeds::program = alea_program.key(),
     )]
-    pub alea_config: UncheckedAccount<'info>,
+    pub alea_config: Account<'info, AleaConfig>,
 
     /// End user / payer for the verify call. Signed by the tx submitter.
     pub payer: Signer<'info>,
