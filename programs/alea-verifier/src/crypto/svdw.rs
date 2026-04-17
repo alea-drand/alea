@@ -77,6 +77,23 @@ fn try_sqrt_curve(x: &Fq) -> Option<Fq> {
 fn try_sqrt_curve(x: &Fq) -> Option<Fq> {
     use anchor_lang::solana_program::alt_bn128::compression::prelude::alt_bn128_g1_decompress;
 
+    // T1.08 — Explicit zero-x guard. Verified via Agave source
+    // (solana-bn254 3.2.1/src/compression.rs:163-164): the syscall
+    // short-circuits on all-zero 32-byte input, returning
+    // `Ok([0u8; 64])` (the point-at-infinity representation) BEFORE
+    // deserialization. Alea's SVDW uses decompress as a sqrt oracle,
+    // so this would incorrectly unwrap `(0,0)` as a valid sqrt of
+    // g(0)=3 (native path returns sqrt(3), so native/BPF diverge).
+    // Reachability under honest drand: ≈ 2⁻²⁵⁴ per candidate; SVDW
+    // theorem guarantees at least one of {x1,x2,x3} is a QR, so
+    // returning None here falls through to the next candidate —
+    // correct SVDW semantics + eliminates the native/BPF divergence
+    // + closes the ADR 0037 "no prior art" landmine for downstream
+    // forks. Source: P02-T1-02 (Opus); R4 arbitration over P01-T2-01.
+    if x.is_zero() {
+        return None;
+    }
+
     // x is guaranteed < p, so byte[0] < 0x30 → MSB (sign bit) is already 0
     // (= "positive y" convention in ark_serialize's BN254 compressed form).
     let x_bytes = fq_to_be_bytes(x);
