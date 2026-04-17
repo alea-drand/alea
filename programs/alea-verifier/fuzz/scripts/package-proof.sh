@@ -61,11 +61,13 @@ trap 'rm -f "$TMP_META"' EXIT
         if [[ -z "$latest_log" ]]; then continue; fi
 
         first_line=$(head -1 "$latest_log")
-        last_stat=$(grep -E ' (INITED|NEW|pulse|DONE|RELOAD) +cov: ' "$latest_log" | tail -1 || echo "")
-        iters=$(echo "$last_stat" | awk '{ for (i=1;i<=NF;i++) if ($i ~ /^#[0-9]+$/) { print substr($i,2); exit } }')
-        cov=$(echo "$last_stat" | awk '{ for (i=1;i<=NF;i++) if ($i=="cov:") { print $(i+1); exit } }')
-        ft=$(echo "$last_stat" | awk '{ for (i=1;i<=NF;i++) if ($i=="ft:") { print $(i+1); exit } }')
-        corp_pair=$(echo "$last_stat" | awk '{ for (i=1;i<=NF;i++) if ($i=="corp:") { print $(i+1); exit } }')
+        # Match any line with 'cov: N ft: N' — covers fork-mode (#N: cov: ...)
+        # AND non-fork (#N pulse cov: ...) output formats.
+        last_stat=$(grep -E 'cov: [0-9]+ ft: [0-9]+' "$latest_log" | tail -1 || echo "")
+        iters=$(echo "$last_stat" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+        cov=$(echo "$last_stat" | grep -oE 'cov: [0-9]+' | head -1 | awk '{ print $2 }')
+        ft=$(echo "$last_stat" | grep -oE 'ft: [0-9]+' | head -1 | awk '{ print $2 }')
+        corp_pair=$(echo "$last_stat" | grep -oE 'corp: [0-9]+(/[0-9a-zA-Z]+)?' | head -1 | awk '{ print $2 }')
         start_ts=$(echo "$first_line" | awk '{ print $1 }' | tr -d '[]')
         end_ts=$(echo "$last_stat" | awk '{ print $1 }' | tr -d '[]')
         crashes=$(find "$ARTIFACTS/$t" -type f ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')
