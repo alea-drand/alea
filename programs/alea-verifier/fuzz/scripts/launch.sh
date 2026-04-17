@@ -32,10 +32,11 @@ ARTIFACTS="$FUZZ_DIR/artifacts"
 CORPUS_ROOT="$FUZZ_DIR/corpus"
 
 TARGETS=(verify_beacon hash_to_g1 on_curve_g1)
-TMUX_SESSION="alea-fuzz"
-MAX_TOTAL_TIME=14400      # 4h per target
-SMOKE_TIME=30             # seconds per target in smoke test
-FORK_WORKERS=3
+TMUX_SESSION="${TMUX_SESSION:-alea-fuzz}"
+MAX_TOTAL_TIME="${MAX_TOTAL_TIME:-14400}"    # 4h per target; override via env for pilot runs
+SMOKE_TIME="${SMOKE_TIME:-30}"               # seconds per target in smoke test
+FORK_WORKERS="${FORK_WORKERS:-3}"
+SKIP_SMOKE="${SKIP_SMOKE:-0}"                # set to 1 to skip smoke on re-launches after pilot
 
 # Solana CLI + cargo binaries need to be on PATH for cargo fuzz.
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$HOME/.cargo/bin:$PATH"
@@ -148,41 +149,63 @@ launch_tmux() {
     fi
 
     log "creating tmux session '$TMUX_SESSION' with 3 horizontal panes..."
-    tmux new-session -d -s "$TMUX_SESSION" -x 220 -y 80 -c "$PROGRAM_DIR"
-    tmux split-window -v -t "$TMUX_SESSION" -c "$PROGRAM_DIR"
-    tmux split-window -v -t "$TMUX_SESSION" -c "$PROGRAM_DIR"
-    tmux select-layout -t "$TMUX_SESSION" even-vertical
 
     local ts
     ts=$(date -u +%Y%m%dT%H%M%SZ)
+    local pane_scripts_dir="$FUZZ_DIR/run-logs/.pane-scripts-$ts"
+    mkdir -p "$pane_scripts_dir"
 
-    for i in 0 1 2; do
-        local target="${TARGETS[$i]}"
+    # Write a self-contained pane script per target. Avoids send-keys
+    # long-string issues (Enter can land before a 900-char string
+    # finishes typing in zsh).
+    write_pane_script() {
+        local target="$1"
         local logfile="$LOGS/${target}-${ts}.log"
+        local script="$pane_scripts_dir/${target}.sh"
         local flags_str
         flags_str=$(flags_for "$target" | tr '\n' ' ')
+        cat > "$script" <<SCRIPT_EOF
+#!/usr/bin/env bash
+# Auto-generated pane script for $target
+export PATH="\$HOME/.local/share/solana/install/active_release/bin:\$HOME/.cargo/bin:\$PATH"
+cd "$PROGRAM_DIR"
+echo "[launch] starting $target at \$(date -u +%FT%TZ)"
+echo "[launch] flags: $flags_str"
+echo ""
+cargo +nightly fuzz run $target -- $flags_str 2>&1 \\
+    | perl -MPOSIX -ne 'BEGIN { \$| = 1 } print "[", POSIX::strftime("%Y-%m-%dT%H:%M:%SZ", gmtime), "] ", \$_' \\
+    | tee "$logfile"
+echo ""
+echo "[DONE] $target finished at \$(date -u +%FT%TZ)"
+echo "Log: $logfile"
+echo "Run: bash $SCRIPTS/status.sh  for summary"
+echo "Ctrl-B d to detach, or exit this shell to close the pane"
+exec \${SHELL:-zsh}
+SCRIPT_EOF
+        chmod +x "$script"
+        echo "$script"
+    }
 
-        # Compose the command that runs in the pane:
-        #   1. export PATH
-        #   2. cd to program dir
-        #   3. cargo fuzz run with flags, stderr+stdout merged
-        #   4. pipe through awk to timestamp every line
-        #   5. tee to log file
-        #   6. on exit, print DONE banner and keep pane open with a shell
-        local cmd
-        cmd="export PATH=\"\$HOME/.local/share/solana/install/active_release/bin:\$HOME/.cargo/bin:\$PATH\"; "
-        cmd+="cd \"$PROGRAM_DIR\"; "
-        cmd+="echo \"[launch] starting $target at \$(date -u +%FT%TZ) with flags: $flags_str\"; "
-        cmd+="cargo +nightly fuzz run $target -- $flags_str 2>&1 | "
-        cmd+="awk '{ print strftime(\"[%Y-%m-%dT%H:%M:%SZ]\"), \$0; fflush() }' | "
-        cmd+="tee \"$logfile\"; "
-        cmd+="echo \"\"; echo \"[DONE] $target finished at \$(date -u +%FT%TZ). Log: $logfile\"; "
-        cmd+="echo \"Run: bash $SCRIPTS/status.sh for summary. Ctrl-B d to detach.\"; "
-        cmd+="exec \${SHELL:-zsh}"
+    local script0 script1 script2
+    script0=$(write_pane_script "${TARGETS[0]}")
+    script1=$(write_pane_script "${TARGETS[1]}")
+    script2=$(write_pane_script "${TARGETS[2]}")
 
-        tmux send-keys -t "$TMUX_SESSION.$i" "$cmd" Enter
-        log "pane $i launched: $target -> $logfile"
-    done
+    # Create the session. First pane is active.
+    tmux new-session -d -s "$TMUX_SESSION" -x 220 -y 80 -c "$PROGRAM_DIR"
+    # Send short command — reliable regardless of length.
+    tmux send-keys -t "$TMUX_SESSION" "bash $script0" Enter
+    log "pane 0 launched: ${TARGETS[0]} -> $LOGS/${TARGETS[0]}-${ts}.log"
+
+    tmux split-window -v -t "$TMUX_SESSION" -c "$PROGRAM_DIR"
+    tmux send-keys -t "$TMUX_SESSION" "bash $script1" Enter
+    log "pane 1 launched: ${TARGETS[1]} -> $LOGS/${TARGETS[1]}-${ts}.log"
+
+    tmux split-window -v -t "$TMUX_SESSION" -c "$PROGRAM_DIR"
+    tmux send-keys -t "$TMUX_SESSION" "bash $script2" Enter
+    log "pane 2 launched: ${TARGETS[2]} -> $LOGS/${TARGETS[2]}-${ts}.log"
+
+    tmux select-layout -t "$TMUX_SESSION" even-vertical
 
     log ""
     log "=================================================================="
@@ -220,11 +243,15 @@ for t in "${TARGETS[@]}"; do
     rm -f "$ARTIFACTS/$t"/* 2>/dev/null || true
 done
 
-log "running smoke test (${SMOKE_TIME}s per target)..."
-for t in "${TARGETS[@]}"; do
-    smoke_test_one "$t"
-done
-log "all 3 smoke tests passed, 0 crash artifacts"
+if [[ "$SKIP_SMOKE" == "1" ]]; then
+    log "SKIP_SMOKE=1 set — skipping smoke test"
+else
+    log "running smoke test (${SMOKE_TIME}s per target)..."
+    for t in "${TARGETS[@]}"; do
+        smoke_test_one "$t"
+    done
+    log "all 3 smoke tests passed, 0 crash artifacts"
+fi
 
 if [[ "$MODE" == "smoke-only" ]]; then
     log "SMOKE-ONLY: exiting before full campaign launch."

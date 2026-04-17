@@ -55,6 +55,11 @@ fmt_age() {
 }
 
 # Print status for one target.
+#
+# libFuzzer -fork output format (one line per job merge, every ~5s):
+#   [TS] #4910388: cov: 1504 ft: 12889 corp: 1767 exec/s: 17275 oom/timeout/crash: 0/0/0 time: 104s job: 22 dft_time: 0
+# Plateau detection for fork mode uses cov-delta-over-time (NEW events aren't
+# emitted in fork mode — master only prints aggregated stat lines).
 status_target() {
     local target="$1"
     local log
@@ -64,39 +69,58 @@ status_target() {
         return
     fi
 
-    # Last pulse/INITED/NEW/DONE line (anything with "cov: " in it).
+    # Match any line containing "cov:" — covers fork-mode "#N: cov:" lines AND
+    # non-fork "#N pulse cov:" lines.
     local last_stat_line
-    last_stat_line=$(grep -E ' (INITED|NEW|pulse|DONE|RELOAD) +cov: ' "$log" | tail -1 || true)
+    last_stat_line=$(grep -E 'cov: [0-9]+ ft: [0-9]+' "$log" | tail -1 || true)
     if [[ -z "$last_stat_line" ]]; then
-        printf "[%-14s] log exists but no libFuzzer stats yet\n" "$target"
+        printf "[%-14s] log exists but no libFuzzer stats yet (cargo building)\n" "$target"
         return
     fi
 
-    # Extract fields via awk — tolerate spacing variance.
-    local iters cov ft corp_count corp_bytes exec_s
-    iters=$(echo "$last_stat_line" | awk '{ for (i=1;i<=NF;i++) if ($i ~ /^#[0-9]+$/) { print substr($i,2); exit } }')
-    cov=$(echo "$last_stat_line" | awk '{ for (i=1;i<=NF;i++) if ($i=="cov:") { print $(i+1); exit } }')
-    ft=$(echo "$last_stat_line" | awk '{ for (i=1;i<=NF;i++) if ($i=="ft:") { print $(i+1); exit } }')
-    exec_s=$(echo "$last_stat_line" | awk '{ for (i=1;i<=NF;i++) if ($i=="exec/s:") { print $(i+1); exit } }')
-    local corp_pair
-    corp_pair=$(echo "$last_stat_line" | awk '{ for (i=1;i<=NF;i++) if ($i=="corp:") { print $(i+1); exit } }')
-    corp_count=${corp_pair%%/*}
-    corp_bytes=${corp_pair##*/}
+    local iters cov ft corp_count exec_s oom_tc
+    iters=$(echo "$last_stat_line" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+    cov=$(echo "$last_stat_line" | grep -oE 'cov: [0-9]+' | head -1 | awk '{ print $2 }')
+    ft=$(echo "$last_stat_line" | grep -oE 'ft: [0-9]+' | head -1 | awk '{ print $2 }')
+    exec_s=$(echo "$last_stat_line" | grep -oE 'exec/s: [0-9]+' | head -1 | awk '{ print $2 }')
+    # corp: 1767 (fork) or corp: 156/892Kb (non-fork) — take first number.
+    corp_count=$(echo "$last_stat_line" | grep -oE 'corp: [0-9]+' | head -1 | awk '{ print $2 }')
+    # oom/timeout/crash (fork mode only, shows child-process failure counts).
+    oom_tc=$(echo "$last_stat_line" | grep -oE 'oom/timeout/crash: [0-9]+/[0-9]+/[0-9]+' | head -1 | awk '{ print $2 }')
 
-    # Last NEW-coverage event timestamp.
-    local last_new_ts_raw last_new_epoch age
-    last_new_ts_raw=$(grep -E ' NEW +cov: ' "$log" | tail -1 | awk '{ print $1 }' | tr -d '[]' || true)
-    if [[ -z "$last_new_ts_raw" ]]; then
-        # No NEW line yet; use INITED line or log start time as origin.
-        last_new_ts_raw=$(head -1 "$log" | awk '{ print $1 }' | tr -d '[]' || true)
-    fi
-    last_new_epoch=$(to_epoch "$last_new_ts_raw")
+    # Plateau detection via cov delta. Find the line from ~60 minutes ago and
+    # compare its cov value to current.
     local now_ep
     now_ep=$(now_epoch)
-    if (( last_new_epoch > 0 )); then
-        age=$(( now_ep - last_new_epoch ))
-    else
-        age=0
+    local old_cov="" old_line cov_age_sec="" line_ts_epoch=0
+
+    # Walk log backwards, find the oldest stat line still within our check window
+    # (60 min back). Use its cov for delta. If no such line (log <60m old), use
+    # first stat line of the log.
+    local cutoff_epoch=$(( now_ep - 3600 ))
+    old_line=$(grep -E 'cov: [0-9]+ ft: [0-9]+' "$log" | head -1 || true)
+    # Scan for most recent line BEFORE cutoff.
+    while IFS= read -r line; do
+        local ts
+        ts=$(echo "$line" | awk '{ print $1 }' | tr -d '[]')
+        local ep
+        ep=$(to_epoch "$ts")
+        if (( ep > 0 && ep <= cutoff_epoch )); then
+            old_line="$line"
+        fi
+    done < <(grep -E 'cov: [0-9]+ ft: [0-9]+' "$log")
+
+    old_cov=$(echo "$old_line" | grep -oE 'cov: [0-9]+' | head -1 | awk '{ print $2 }')
+    local old_ts
+    old_ts=$(echo "$old_line" | awk '{ print $1 }' | tr -d '[]')
+    line_ts_epoch=$(to_epoch "$old_ts")
+    if (( line_ts_epoch > 0 )); then
+        cov_age_sec=$(( now_ep - line_ts_epoch ))
+    fi
+
+    local cov_delta="?"
+    if [[ -n "$old_cov" && -n "$cov" ]]; then
+        cov_delta=$(( cov - old_cov ))
     fi
 
     # Corpus file count from disk (ground truth).
@@ -105,17 +129,28 @@ status_target() {
         corpus_disk=$(find "$CORPUS_ROOT/$target" -type f 2>/dev/null | wc -l | tr -d ' ')
     fi
 
-    # Verdict.
+    # Verdict based on cov delta over elapsed window.
     local verdict
-    if (( age < 900 )); then
+    if [[ "$cov_delta" == "?" || -z "$cov_age_sec" ]]; then
+        verdict="WARMING"
+    elif (( cov_age_sec < 900 )); then
         verdict="GROWING"
-    elif (( age < 3600 )); then
-        verdict="SLOWING"
+    elif (( cov_delta > 0 )); then
+        if (( cov_age_sec < 3600 )); then
+            verdict="GROWING"
+        else
+            verdict="SLOWING"
+        fi
     else
-        verdict="PLATEAU"
+        # cov_delta == 0
+        if (( cov_age_sec >= 3600 )); then
+            verdict="PLATEAU"
+        else
+            verdict="SLOWING"
+        fi
     fi
 
-    # Crash check.
+    # Crash check. Fork-mode oom/timeout/crash counter in logs.
     local crashes=0
     if [[ -d "$ARTIFACTS_ROOT/$target" ]]; then
         crashes=$(find "$ARTIFACTS_ROOT/$target" -type f ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')
@@ -124,9 +159,12 @@ status_target() {
     if (( crashes > 0 )); then
         crash_tag=" CRASHES=$crashes"
     fi
+    if [[ -n "$oom_tc" && "$oom_tc" != "0/0/0" ]]; then
+        crash_tag="$crash_tag fork-oom/to/crash=$oom_tc"
+    fi
 
-    printf "[%-14s] iters=%-10s cov=%-6s ft=%-6s corp=%-4s (disk=%s) exec/s=%-7s last_NEW=%-7s  -> %s%s\n" \
-        "$target" "${iters:-?}" "${cov:-?}" "${ft:-?}" "${corp_count:-?}" "$corpus_disk" "${exec_s:-?}" "$(fmt_age "$age")" "$verdict" "$crash_tag"
+    printf "[%-14s] iters=%-10s cov=%-5s ft=%-5s corp=%-4s (disk=%s) exec/s=%-6s cov_Δ%s=%s  -> %s%s\n" \
+        "$target" "${iters:-?}" "${cov:-?}" "${ft:-?}" "${corp_count:-?}" "$corpus_disk" "${exec_s:-?}" "$(fmt_age "${cov_age_sec:-0}")" "$cov_delta" "$verdict" "$crash_tag"
 }
 
 main() {
@@ -140,8 +178,10 @@ main() {
         status_target "$t"
     done
     echo ""
-    echo "Verdict thresholds: GROWING <15m since NEW | SLOWING 15-60m | PLATEAU >=60m"
-    echo "  Crashes land in $ARTIFACTS_ROOT/<target>/ — inspect with: cargo fuzz tmin <target> <artifact>"
+    echo "Verdict: WARMING <start>, GROWING <15m or cov still rising,"
+    echo "         SLOWING >=15m with small growth, PLATEAU >=60m with zero cov delta."
+    echo "cov_Δ<window> = edges gained across that window (0 at PLATEAU)."
+    echo "Crashes land in $ARTIFACTS_ROOT/<target>/ — inspect with: cargo fuzz tmin <target> <artifact>"
 }
 
 main "$@"
