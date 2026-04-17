@@ -46,7 +46,10 @@ fn verify_beacon_full(
 
     // msg_hash = keccak256(round.to_be_bytes()) happens inside hash_round_to_g1
     // (T1.02/T1.03: drand signs H2C(keccak256(8-byte BE round)))
-    let m = hash_round_to_g1(round);
+    // T1.05 — hash_round_to_g1 now returns Result; None from map_to_point
+    // maps to AleaError::NoSquareRoot (6004), Err from g1_add syscall maps
+    // to AleaError::PairingError (6006). ? propagates both.
+    let m = hash_round_to_g1(round)?;
     let neg_m = negate_g1(&m);
 
     match verify_pairing(signature, &neg_m, pubkey_g2, &G2_GENERATOR) {
