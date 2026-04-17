@@ -225,6 +225,25 @@ mod tests {
 
         let q0 = map_to_point(&u0);
         let q1 = map_to_point(&u1);
+
+        // T1.03 — individual Q0 / Q1 byte-for-byte assertions against
+        // gnark-crypto fixtures (round-1.json:30-33). The sum assertion
+        // below passes for (-Q0, -Q1) and (Q1, Q0) swaps (G1 addition
+        // commutative, anti-commutative under negation). These per-point
+        // assertions pin branch selection + sign correction individually.
+        assert_eq!(hex::encode(&q0[0..32]),
+            "1e10b19957a0ab51d8ed02605e5fdb691f78e287817525ed109cb0b5b2519723",
+            "Round 1 Q0.x must match gnark-crypto MapToG1");
+        assert_eq!(hex::encode(&q0[32..64]),
+            "0742fdfa5dba51b9c799434e73fbb705930d9e29cefad99b31f7255b0d62d370",
+            "Round 1 Q0.y must match gnark-crypto MapToG1");
+        assert_eq!(hex::encode(&q1[0..32]),
+            "15b1de83d800a488b346a8e46b60404911b9e24f8f0ce295fb1940f2e81fe902",
+            "Round 1 Q1.x must match gnark-crypto MapToG1");
+        assert_eq!(hex::encode(&q1[32..64]),
+            "21e341fa458ee12634b567e980ff1561fba99ef9e6858e30373b2bb5b3fb2ccf",
+            "Round 1 Q1.y must match gnark-crypto MapToG1");
+
         let m = g1_add(
             <&[u8; 64]>::try_from(q0.as_ref()).unwrap(),
             <&[u8; 64]>::try_from(q1.as_ref()).unwrap(),
@@ -250,6 +269,22 @@ mod tests {
 
         let q0 = map_to_point(&u0);
         let q1 = map_to_point(&u1);
+
+        // T1.03 — individual Q0 / Q1 byte-for-byte assertions against
+        // gnark-crypto fixtures (round-9337227.json:30-33).
+        assert_eq!(hex::encode(&q0[0..32]),
+            "0bdac09968c4675115f5173ed5a2af9da4dd42dea8d82824cd45d4e40c52f4c3",
+            "Round 9337227 Q0.x must match gnark-crypto MapToG1");
+        assert_eq!(hex::encode(&q0[32..64]),
+            "1db41b01f6e7a7e1463e4eb6dd35ffd39deca11bf020262592c2f2e3a9e871e2",
+            "Round 9337227 Q0.y must match gnark-crypto MapToG1");
+        assert_eq!(hex::encode(&q1[0..32]),
+            "2c547cc28601f4c5376d75d935d493dcde85f549ed79c1d136227fa7588a09d8",
+            "Round 9337227 Q1.x must match gnark-crypto MapToG1");
+        assert_eq!(hex::encode(&q1[32..64]),
+            "1116342a64c29038836c8b7b8c1270ca8af9535ca542a0aee6d6b82855157ad3",
+            "Round 9337227 Q1.y must match gnark-crypto MapToG1");
+
         let m = g1_add(
             <&[u8; 64]>::try_from(q0.as_ref()).unwrap(),
             <&[u8; 64]>::try_from(q1.as_ref()).unwrap(),
