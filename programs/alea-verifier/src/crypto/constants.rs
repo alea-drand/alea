@@ -81,6 +81,20 @@ pub const EXPECTED_EVMNET_CHAIN_HASH: [u8; 32] = [
     0x32, 0x18, 0x77, 0x51, 0x16, 0x6e, 0xc8, 0xc3,
 ];
 
+// T2.E — byte-equality guards for `genesis_time` + `period` against the
+// canonical drand evmnet chain parameters. Source:
+// `build-spec/testing/fixtures/chain-info.json` (genesis_time=1727521075,
+// period=3). These make config.initialize/update_config fully deterministic
+// — no authority can set genesis=0 or period=0 (which would DoS consumer
+// programs reading config.period in timing math).
+//
+// Rationale: Alea is a single-chain deployment (drand evmnet). Any other
+// values would be a wrong-chain deployment that chain_hash guard SHOULD
+// catch — but T2.E adds belt-and-suspenders. Sources: P03-T2-01, P10-T2-03,
+// Codex E HIGH (5,6). ADR 0031 extended.
+pub const EXPECTED_EVMNET_GENESIS_TIME: u64 = 1_727_521_075;
+pub const EXPECTED_EVMNET_PERIOD: u64 = 3;
+
 // BN254 base field prime p (big-endian bytes) for big_mod_exp fallback
 pub const P_BE: [u8; 32] = [
     0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29,
