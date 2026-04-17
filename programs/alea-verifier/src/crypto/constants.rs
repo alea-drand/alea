@@ -200,7 +200,6 @@ mod tests {
     #[test]
     fn non_subgroup_g2_point_rejected_by_fallback_path() {
         use ark_bn254::{Fq as ArkFq, Fq2, G2Affine};
-        use ark_ec::AffineRepr;
 
         // Non-subgroup G2 point from g2-non-subgroup.json:
         //   x_c1 = 7, x_c0 = 0
@@ -258,7 +257,6 @@ mod tests {
     #[test]
     fn g2_generator_is_on_curve_and_in_subgroup() {
         use ark_bn254::{Fq as ArkFq, Fq2, G2Affine};
-        use ark_ec::AffineRepr;
 
         // EIP-197 G2 encoding: x_c1 || x_c0 || y_c1 || y_c0, each 32 BE bytes.
         let x_c1 = ArkFq::from_be_bytes_mod_order(&G2_GENERATOR[0..32]);

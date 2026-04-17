@@ -214,6 +214,12 @@ fn decode_g2(bytes: &[u8; 128]) -> ark_bn254::G2Affine {
     ark_bn254::G2Affine::new_unchecked(x, y)
 }
 
+#[allow(clippy::needless_range_loop)]
+// Explicit indexed iteration is correct here: `i` doubles as the limb
+// index AND as the per-limb byte offset (`offset = 24 - i * 8`). Rewriting
+// with `.iter_mut().enumerate()` would still need the same offset
+// computation and adds no clarity. T3-C rationale: not const-time, just
+// a deliberate index-driven decode.
 fn bytes_to_bigint(bytes: &[u8; 32]) -> BigInteger256 {
     // Big-endian bytes to little-endian limbs
     let mut limbs = [0u64; 4];
