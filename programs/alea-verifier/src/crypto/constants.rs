@@ -179,6 +179,77 @@ mod tests {
         assert_eq!(G2_GENERATOR.len(), 128);
     }
 
+    // T1.10 — g2-non-subgroup fallback-path rejection. Previously the
+    // `build-spec/testing/fixtures/g2-non-subgroup.json` fixture was
+    // orphaned (verify-fixtures.ts only checked structural fields, never
+    // fed the hex into any validator). ADR 0027's fallback path means
+    // the actual rejection code is 6008 WrongPubkey (byte-equality guard),
+    // NOT 6005 InvalidG2Point (primary path, unreachable under fallback).
+    //
+    // This test exercises the fallback path against a verified non-
+    // subgroup G2 point (gnark-crypto IsInSubGroup()=false, generated
+    // via build-spec/testing/scripts/g2gen/main.go seed=0 x=(0,7)):
+    //   1. Proves non-subgroup bytes != EXPECTED_EVMNET_PUBKEY → guard
+    //      WOULD fire with AleaError::WrongPubkey (6008)
+    //   2. Cross-validates the fixture's on-curve + non-subgroup claims
+    //      by running ark-ec checks natively
+    //
+    // A full TS integration test that calls update_config_handler with
+    // these bytes + asserts runtime error 6008 is deferred to Wave G
+    // anchor-test suite. Source: P10-T1-02, P02-T2-03, P03-T2-02.
+    #[test]
+    fn non_subgroup_g2_point_rejected_by_fallback_path() {
+        use ark_bn254::{Fq as ArkFq, Fq2, G2Affine};
+        use ark_ec::AffineRepr;
+
+        // Non-subgroup G2 point from g2-non-subgroup.json:
+        //   x_c1 = 7, x_c0 = 0
+        //   y_c1 = 0x1bfb0d7f..., y_c0 = 0x17aa7aaa...
+        let non_subgroup_pubkey: [u8; 128] = {
+            let mut buf = [0u8; 128];
+            // x_c1: 0x07 (tail byte)
+            buf[31] = 0x07;
+            // x_c0: all zeros (already)
+            // y_c1: 0x1bfb0d7fef30761e7085727033ce4957d5918eb58ba1b6daa2e4d2eb7e754508
+            buf[64..96].copy_from_slice(&hex::decode(
+                "1bfb0d7fef30761e7085727033ce4957d5918eb58ba1b6daa2e4d2eb7e754508",
+            ).unwrap());
+            // y_c0: 0x17aa7aaa16adcaf33dc48f9e18c0305a3e00c9bf106a38af106ca6a96df87aca
+            buf[96..128].copy_from_slice(&hex::decode(
+                "17aa7aaa16adcaf33dc48f9e18c0305a3e00c9bf106a38af106ca6a96df87aca",
+            ).unwrap());
+            buf
+        };
+
+        // (1) The fallback path guard: non_subgroup_pubkey != EXPECTED_EVMNET_PUBKEY.
+        // This is what `require!(pubkey_g2 == EXPECTED_EVMNET_PUBKEY, AleaError::WrongPubkey)`
+        // in initialize_handler + update_config_handler checks at runtime.
+        assert_ne!(
+            non_subgroup_pubkey, EXPECTED_EVMNET_PUBKEY,
+            "Non-subgroup G2 point MUST differ from canonical evmnet pubkey \
+             (fallback path would emit 6008 WrongPubkey at runtime)"
+        );
+
+        // (2) Cross-validate the fixture claims natively via ark-ec.
+        let x_c1 = ArkFq::from_be_bytes_mod_order(&non_subgroup_pubkey[0..32]);
+        let x_c0 = ArkFq::from_be_bytes_mod_order(&non_subgroup_pubkey[32..64]);
+        let y_c1 = ArkFq::from_be_bytes_mod_order(&non_subgroup_pubkey[64..96]);
+        let y_c0 = ArkFq::from_be_bytes_mod_order(&non_subgroup_pubkey[96..128]);
+
+        let x = Fq2::new(x_c0, x_c1);
+        let y = Fq2::new(y_c0, y_c1);
+        let point = G2Affine::new_unchecked(x, y);
+
+        assert!(
+            point.is_on_curve(),
+            "Fixture claim: point IS on BN254 G2 curve (verified_on_curve: true)"
+        );
+        assert!(
+            !point.is_in_correct_subgroup_assuming_on_curve(),
+            "Fixture claim: point is NOT in prime-order subgroup (verified_not_in_subgroup: true)"
+        );
+    }
+
     // P10-T3-05 — G2_GENERATOR mathematical correctness. A single wrong
     // byte here would cause every pairing to return false silently —
     // program appears to work but rejects all valid signatures. Native
