@@ -31,15 +31,36 @@ LOGS="$FUZZ_DIR/run-logs"
 ARTIFACTS="$FUZZ_DIR/artifacts"
 CORPUS_ROOT="$FUZZ_DIR/corpus"
 
-TARGETS=(verify_beacon hash_to_g1 on_curve_g1)
+TARGETS=(verify_beacon hash_to_g1 on_curve_g1 hash_to_field_canonicity pairing_buffer_parses)
 TMUX_SESSION="${TMUX_SESSION:-alea-fuzz}"
 MAX_TOTAL_TIME="${MAX_TOTAL_TIME:-14400}"    # 4h per target; override via env for pilot runs
 SMOKE_TIME="${SMOKE_TIME:-30}"               # seconds per target in smoke test
 FORK_WORKERS="${FORK_WORKERS:-3}"
 SKIP_SMOKE="${SKIP_SMOKE:-0}"                # set to 1 to skip smoke on re-launches after pilot
+MIN_DISK_GB="${MIN_DISK_GB:-30}"             # Stage 8 requires ≥30 GB free for 15 processes
 
 # Solana CLI + cargo binaries need to be on PATH for cargo fuzz.
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$HOME/.cargo/bin:$PATH"
+
+# G8 — disk budget preflight (15 libFuzzer processes × 13h ≈ 10-20 GB artifacts).
+avail_kb=$(df -k "$PWD" | awk 'NR==2 {print $4}')
+min_kb=$((MIN_DISK_GB * 1024 * 1024))
+if [[ "$avail_kb" -lt "$min_kb" ]]; then
+    echo "[launch] ERROR: Need ≥${MIN_DISK_GB} GB free for ${#TARGETS[@]} × fork=${FORK_WORKERS} fuzz campaign." >&2
+    echo "[launch] Available: $((avail_kb / 1024 / 1024)) GB; required: ${MIN_DISK_GB} GB." >&2
+    exit 1
+fi
+
+# G14 — SIMD-0334 mainnet-beta feature gate preflight (live since epoch 942).
+# Warn if Solana CLI doesn't report it live; doesn't abort (might be on a
+# cluster where the feature isn't deployed).
+if command -v solana >/dev/null 2>&1; then
+    if solana feature status 2>/dev/null | grep -q '0334'; then
+        echo "[launch] SIMD-0334 feature gate detected on current cluster."
+    else
+        echo "[launch] WARN: SIMD-0334 not found via 'solana feature status' — check your cluster config if pairing syscall tests fail."
+    fi
+fi
 
 log() { printf "[launch] %s\n" "$*"; }
 die() { printf "[launch] ERROR: %s\n" "$*" >&2; exit 1; }
@@ -63,7 +84,7 @@ check_tooling() {
 }
 
 build_targets() {
-    log "building 3 fuzz targets with nightly..."
+    log "building ${#TARGETS[@]} fuzz targets with nightly..."
     cd "$PROGRAM_DIR"
     cargo +nightly fuzz build 2>&1 | tail -20
     local bindir
@@ -72,7 +93,7 @@ build_targets() {
     for t in "${TARGETS[@]}"; do
         [[ -x "$bindir/$t" ]] || die "missing binary: $bindir/$t"
     done
-    log "all 3 binaries present in $bindir"
+    log "all ${#TARGETS[@]} binaries present in $bindir"
 }
 
 seed_corpus() {
@@ -91,6 +112,17 @@ prepare_dirs() {
     done
 }
 
+# Return 1 if target has fixed-size input (no max_len needed), 0 otherwise.
+# Fixed-size targets: on_curve_g1 ([u8; 64]), hash_to_field_canonicity ([u8; 32]),
+# pairing_buffer_parses ([u8; 64]). Variable: verify_beacon (Arbitrary struct),
+# hash_to_g1 (Arbitrary enum with Vec<u8>).
+target_is_fixed_size() {
+    case "$1" in
+        on_curve_g1|hash_to_field_canonicity|pairing_buffer_parses) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # Build libFuzzer flag list for a given target.
 flags_for() {
     local target="$1"
@@ -102,7 +134,7 @@ flags_for() {
         "-print_final_stats=1"
         "-artifact_prefix=$ARTIFACTS/$target/"
     )
-    if [[ "$target" != "on_curve_g1" ]]; then
+    if ! target_is_fixed_size "$target"; then
         flags+=("-max_len=1024")
     fi
     printf '%s\n' "${flags[@]}"
@@ -115,7 +147,7 @@ flags_for_smoke() {
         "-max_total_time=$SMOKE_TIME"
         "-artifact_prefix=$ARTIFACTS/$target/"
     )
-    if [[ "$target" != "on_curve_g1" ]]; then
+    if ! target_is_fixed_size "$target"; then
         flags+=("-max_len=1024")
     fi
     printf '%s\n' "${flags[@]}"
@@ -130,7 +162,7 @@ smoke_test_one() {
         "-max_total_time=$SMOKE_TIME"
         "-artifact_prefix=$ARTIFACTS/$target/"
     )
-    if [[ "$target" != "on_curve_g1" ]]; then
+    if ! target_is_fixed_size "$target"; then
         flags+=("-max_len=1024")
     fi
     # Run to completion; capture exit code.
@@ -186,24 +218,24 @@ SCRIPT_EOF
         echo "$script"
     }
 
-    local script0 script1 script2
-    script0=$(write_pane_script "${TARGETS[0]}")
-    script1=$(write_pane_script "${TARGETS[1]}")
-    script2=$(write_pane_script "${TARGETS[2]}")
+    # Write one pane script per target.
+    local scripts=()
+    for t in "${TARGETS[@]}"; do
+        scripts+=("$(write_pane_script "$t")")
+    done
 
     # Create the session. First pane is active.
     tmux new-session -d -s "$TMUX_SESSION" -x 220 -y 80 -c "$PROGRAM_DIR"
-    # Send short command — reliable regardless of length.
-    tmux send-keys -t "$TMUX_SESSION" "bash $script0" Enter
+    tmux send-keys -t "$TMUX_SESSION" "bash ${scripts[0]}" Enter
     log "pane 0 launched: ${TARGETS[0]} -> $LOGS/${TARGETS[0]}-${ts}.log"
 
-    tmux split-window -v -t "$TMUX_SESSION" -c "$PROGRAM_DIR"
-    tmux send-keys -t "$TMUX_SESSION" "bash $script1" Enter
-    log "pane 1 launched: ${TARGETS[1]} -> $LOGS/${TARGETS[1]}-${ts}.log"
-
-    tmux split-window -v -t "$TMUX_SESSION" -c "$PROGRAM_DIR"
-    tmux send-keys -t "$TMUX_SESSION" "bash $script2" Enter
-    log "pane 2 launched: ${TARGETS[2]} -> $LOGS/${TARGETS[2]}-${ts}.log"
+    # Add additional panes for targets 1..N-1 via vertical splits.
+    local i
+    for ((i = 1; i < ${#TARGETS[@]}; i++)); do
+        tmux split-window -v -t "$TMUX_SESSION" -c "$PROGRAM_DIR"
+        tmux send-keys -t "$TMUX_SESSION" "bash ${scripts[$i]}" Enter
+        log "pane $i launched: ${TARGETS[$i]} -> $LOGS/${TARGETS[$i]}-${ts}.log"
+    done
 
     tmux select-layout -t "$TMUX_SESSION" even-vertical
 
@@ -250,7 +282,7 @@ else
     for t in "${TARGETS[@]}"; do
         smoke_test_one "$t"
     done
-    log "all 3 smoke tests passed, 0 crash artifacts"
+    log "all ${#TARGETS[@]} smoke tests passed, 0 crash artifacts"
 fi
 
 if [[ "$MODE" == "smoke-only" ]]; then
