@@ -175,12 +175,42 @@ mod tests {
         assert_eq!(EXPECTED_EVMNET_CHAIN_HASH.len(), 32);
     }
 
+    // T2.W upgrade — pin against canonical BN254 base field prime, not just
+    // self-consistency between our two representations. Previous test only
+    // asserted P_BIGINT.to_bytes_be() == P_BE, which would pass even if both
+    // constants were corrupted identically (e.g., cloned from a different
+    // curve). Now three assertions:
+    //  (1) P_BIGINT equals ark-bn254's canonical <Fq as PrimeField>::MODULUS
+    //  (2) P_BE equals EIP-197 §5 canonical hex
+    //  (3) Cross-consistency preserved
     #[test]
     fn p_bigint_matches_p_be() {
-        let p_fq = Fq::from(0u64) - Fq::from(1u64) + Fq::from(1u64);
-        let _ = p_fq; // just verifying the constant is well-formed
-        let p_from_bigint = P_BIGINT;
-        let p_bytes = p_from_bigint.to_bytes_be();
-        assert_eq!(p_bytes, P_BE, "P_BIGINT and P_BE must encode the same prime");
+        // (1) P_BIGINT matches ground-truth canonical BN254 modulus
+        assert_eq!(
+            P_BIGINT,
+            <Fq as PrimeField>::MODULUS,
+            "P_BIGINT must equal <Fq as PrimeField>::MODULUS (canonical BN254 base field prime)"
+        );
+
+        // (2) P_BE matches EIP-197 §5 canonical encoding
+        // p = 21888242871839275222246405745257275088696311157297823662689037894645226208583
+        // hex: 30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+        let expected_p_be: [u8; 32] = hex::decode(
+            "30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47",
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+        assert_eq!(
+            P_BE, expected_p_be,
+            "P_BE must match EIP-197 §5 canonical hex encoding of BN254 p"
+        );
+
+        // (3) Cross-consistency: the two representations encode the same integer
+        let p_bytes = P_BIGINT.to_bytes_be();
+        assert_eq!(
+            p_bytes, P_BE,
+            "P_BIGINT.to_bytes_be() must equal P_BE byte array"
+        );
     }
 }
