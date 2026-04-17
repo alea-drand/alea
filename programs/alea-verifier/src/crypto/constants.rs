@@ -92,7 +92,7 @@ pub const P_BE: [u8; 32] = [
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark_ff::{BigInteger, Field};
+    use ark_ff::{BigInteger, Field, PrimeField};
 
     #[test]
     fn fq_basic_ops() {
@@ -107,6 +107,21 @@ mod tests {
         let c3_sq = C3.square();
         let neg_12: Fq = -Fq::from(12u64);
         assert_eq!(c3_sq, neg_12, "C3² must equal -12 mod p");
+    }
+
+    // T1.02 — sgn0(C3) == 0 const-sanity. Both C3 and p-C3 square to -12;
+    // without this test, a stale copy-paste or refactor could swap them
+    // silently and every SVDW tv5 term would flip sign, swapping x1 ↔ x2.
+    // RFC 9380 §8.9.1 mandates sgn0(C3) == 0 (smaller-root convention).
+    #[test]
+    fn c3_sgn0_is_zero() {
+        let c3_bigint = C3.into_bigint();
+        assert_eq!(
+            c3_bigint.0[0] & 1,
+            0,
+            "C3 MUST be the sqrt(-12) root with sgn0=0 (even). \
+             If this fails, C3 may have been replaced with p - C3."
+        );
     }
 
     #[test]
