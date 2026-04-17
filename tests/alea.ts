@@ -398,8 +398,22 @@ describe("Alea Phase 2 — Localnet Integration", () => {
       }
     });
 
-    it("P0#10 happy path — config fields updated, ConfigUpdated event fires", async () => {
-      // No-op update (same values) — still triggers event
+    it("P0#10 happy path — update_config no-op returns Ok + NO event (T2.D idempotency)", async () => {
+      // T2.D (Wave E, commit 8166f12) — update_config_handler early-returns
+      // without emitting ConfigUpdated if all four fields match stored values.
+      // Eliminates the event-spam attack surface where a compromised authority
+      // could flood indexers with no-op updates (P06-T2-01).
+      //
+      // T2.E (Wave E, commit 8166f12) — all four Config fields must equal
+      // EXPECTED_EVMNET_* constants (new error codes 6010/6011 for
+      // genesis_time/period). So the ONLY successful update_config call
+      // passes byte-identical values, which triggers T2.D idempotency and
+      // returns Ok without emitting an event. In practice update_config
+      // is operationally a no-op under ADR 0027 single-chain design; the
+      // instruction + event schema exist for ADR 0028 CPI stability.
+      //
+      // Pre-T2.D: no-op update fired ConfigUpdated.
+      // Post-T2.D: no-op update succeeds silently (tx ok, no event).
       const tx = await aleaProgram.methods
         .updateConfig(
           Array.from(EVMNET_PUBKEY),
@@ -419,22 +433,8 @@ describe("Alea Phase 2 — Localnet Integration", () => {
       });
       const logs = info?.meta?.logMessages ?? [];
       const programDataLog = logs.find((l) => l.startsWith("Program data:"));
-      expect(programDataLog).to.not.be.undefined;
-
-      const coder = new anchor.BorshEventCoder(aleaIdl as anchor.Idl);
-      const event = coder.decode(programDataLog!.replace("Program data: ", ""));
-      expect(event?.name).to.equal("ConfigUpdated");
-      // Anchor 0.30.1 BorshEventCoder preserves IDL-declared field names
-      // (snake_case in our hand-written IDL), not camelCase.
-      const data = event!.data as any;
-      const chainHash = data.chainHash ?? data.chain_hash;
-      const pubkeyG2Hash = data.pubkeyG2Hash ?? data.pubkey_g2_hash;
-      expect(data.authority.toBase58()).to.equal(
-        provider.wallet.publicKey.toBase58(),
-      );
-      expect(Buffer.from(chainHash).equals(EVMNET_CHAIN_HASH)).to.equal(true);
-      // pubkey_g2_hash must be sha256(EVMNET_PUBKEY) — 32 bytes, not raw 128
-      expect(pubkeyG2Hash.length).to.equal(32);
+      expect(programDataLog, "T2.D: no ConfigUpdated event on no-op update").to
+        .be.undefined;
     });
   });
 
@@ -490,10 +490,29 @@ describe("Alea Phase 2 — Localnet Integration", () => {
           .rpc();
         expect.fail("wrong PDA must be rejected by seeds::program");
       } catch (err: any) {
-        // Anchor ConstraintSeeds = 2006. Any 2xxx is acceptable — this is
-        // a constraint-layer rejection, not our custom 6xxx.
+        // T2.B (Wave H, commit 4380d57) — cpi-consumer changed from
+        // UncheckedAccount<'info> to Account<'info, AleaConfig>. Anchor now
+        // performs account deserialization BEFORE the seeds::program
+        // constraint fires. A PDA from the wrong program ID triggers
+        // AccountOwnedByWrongProgram (3007) / AccountDiscriminatorMismatch
+        // (3002) / AccountNotInitialized (3012) BEFORE the seeds::program
+        // constraint's 2006 ConstraintSeeds code.
+        //
+        // Pre-T2.B: UncheckedAccount → seeds::program (2006) → 2xxx
+        // Post-T2.B: Account<Config> → account deserialization error → 3xxx
+        //
+        // Both are correct rejections; T2.B is a belt-and-suspenders
+        // strengthening (ADR 0034 seeds::program still mandatory AND
+        // account type validation catches substitution at the deserialization
+        // layer). Accept either 2xxx or 3xxx as valid rejection codes.
         const code = errCode(err);
-        expect(code).to.be.within(2000, 2999);
+        expect(
+          code,
+          `wrong PDA must trigger Anchor 2xxx seeds::program constraint OR 3xxx account deserialization error (got ${code})`,
+        ).to.satisfy(
+          (c: number) =>
+            (c >= 2000 && c <= 2999) || (c >= 3000 && c <= 3999),
+        );
       }
     });
   });
