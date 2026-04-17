@@ -1,21 +1,17 @@
 [toolchain]
-# TBD (Phase 1.1.A — ark-ff BPF compilation baseline per ADR 0023)
+# Pinned rustc version that produced the Phase 2 audit-clean BPF binary.
+# Binary reproducibility is load-bearing for Phase 5 external audit
+# attestation + ADR 0009 immutable upgrade authority. Do NOT change
+# without an ADR amendment + full test + fuzz re-run.
 #
-# This file pins the Rust toolchain version used to build Alea. Phase 1.1.A
-# exhaustively tests ark-ff 0.5.x stock → patched fork (azixus/algebra) →
-# 0.4.2 → raw u256 fallback. The SUCCESSFUL compilation's Rust channel is
-# recorded here.
+# Audit baseline: Phase 2.5 Stage 5b fuzz campaign (1.77B iter, 0 crashes)
+# compiled with this exact channel (recorded in
+# `build-spec/audit-r5/baseline-versions.txt` and
+# `programs/alea-verifier/fuzz/environment.txt`).
 #
-# Resolution criteria (Phase 1.1.A completion):
-#   1. ark-ff variant chosen (per validation-report.md entry)
-#   2. `rustc --version` of the toolchain that produced a working BPF build
-#   3. Commit this file with the concrete version, remove TBD comment
-#
-# Placeholder until resolved (1.79.0 too old for current crates.io index):
-channel = "stable"
+# Resolution of prior T1.06 (P04 Opus): was `channel = "stable"` — placeholder
+# was a Phase 1.1.A completion item that leaked into Phase 2.
+channel = "1.94.1"
 components = ["rustfmt", "clippy"]
 # targets = ["sbf-solana-solana"]  # Provided by Solana CLI (cargo-build-sbf), not rustup
 profile = "minimal"
-
-# OPEN-ITEMS.md #2 tracks this. Do NOT commit a speculative channel value —
-# the Phase 1.1.A validation-report.md entry is the source of truth.
