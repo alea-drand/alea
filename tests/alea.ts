@@ -20,6 +20,7 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 import { expect } from "chai";
+import { createHash } from "crypto";
 
 import aleaIdl from "../target/idl/alea_verifier.json";
 import cpiConsumerIdl from "../target/idl/cpi_consumer.json";
@@ -436,6 +437,106 @@ describe("Alea Phase 2 — Localnet Integration", () => {
       expect(programDataLog, "T2.D: no ConfigUpdated event on no-op update").to
         .be.undefined;
     });
+
+    // T2.F — update_config error-code coverage for byte-equality guards
+    // (Wave E commit 8166f12 — T2.E introduced byte-equality checks on all
+    // four Config fields. These tests exercise each guard path.)
+    //
+    // Guard order in update_config_handler (programs/alea-verifier/src/instructions/update_config.rs):
+    //   1. chain_hash    != EXPECTED_EVMNET_CHAIN_HASH   -> 6007 WrongChainHash
+    //   2. pubkey_g2     != EXPECTED_EVMNET_PUBKEY       -> 6008 WrongPubkey
+    //   3. genesis_time  != EXPECTED_EVMNET_GENESIS_TIME -> 6010 InvalidGenesisTime
+    //   4. period        != EXPECTED_EVMNET_PERIOD       -> 6011 InvalidPeriod
+    // Each test passes 3 correct values + 1 wrong so the single-field guard fires.
+    it("T2.F#1 wrong chain_hash rejected with 6007 WrongChainHash", async () => {
+      const wrongChainHash = Buffer.alloc(32, 0xff);
+      try {
+        await aleaProgram.methods
+          .updateConfig(
+            Array.from(EVMNET_PUBKEY),
+            EVMNET_GENESIS,
+            EVMNET_PERIOD,
+            Array.from(wrongChainHash),
+          )
+          .accounts({
+            config: configPda,
+            authority: provider.wallet.publicKey,
+          })
+          .rpc();
+        expect.fail("wrong chain_hash must be rejected");
+      } catch (err: any) {
+        expect(errCode(err)).to.equal(6007);
+      }
+    });
+
+    it("T2.F#2 wrong pubkey_g2 rejected with 6008 WrongPubkey", async () => {
+      const wrongPubkey = Buffer.alloc(128, 0xff);
+      try {
+        await aleaProgram.methods
+          .updateConfig(
+            Array.from(wrongPubkey),
+            EVMNET_GENESIS,
+            EVMNET_PERIOD,
+            Array.from(EVMNET_CHAIN_HASH),
+          )
+          .accounts({
+            config: configPda,
+            authority: provider.wallet.publicKey,
+          })
+          .rpc();
+        expect.fail("wrong pubkey_g2 must be rejected");
+      } catch (err: any) {
+        expect(errCode(err)).to.equal(6008);
+      }
+    });
+
+    it("T2.F#3 wrong genesis_time rejected with 6010 InvalidGenesisTime", async () => {
+      // Classic "period=0 consumer DoS under compromised auth" scenario:
+      // passing 0 for genesis_time would bypass any consumer freshness check
+      // that relies on (now - genesis_time) / period. T2.E closes this.
+      const wrongGenesis = new BN(0);
+      try {
+        await aleaProgram.methods
+          .updateConfig(
+            Array.from(EVMNET_PUBKEY),
+            wrongGenesis,
+            EVMNET_PERIOD,
+            Array.from(EVMNET_CHAIN_HASH),
+          )
+          .accounts({
+            config: configPda,
+            authority: provider.wallet.publicKey,
+          })
+          .rpc();
+        expect.fail("wrong genesis_time must be rejected");
+      } catch (err: any) {
+        expect(errCode(err)).to.equal(6010);
+      }
+    });
+
+    it("T2.F#4 wrong period rejected with 6011 InvalidPeriod", async () => {
+      // Period=0 would cause divide-by-zero in any consumer freshness
+      // check that computes (now - genesis_time) / period; period=9999
+      // here is just a non-3 value to exercise the byte-inequality path.
+      const wrongPeriod = new BN(9999);
+      try {
+        await aleaProgram.methods
+          .updateConfig(
+            Array.from(EVMNET_PUBKEY),
+            EVMNET_GENESIS,
+            wrongPeriod,
+            Array.from(EVMNET_CHAIN_HASH),
+          )
+          .accounts({
+            config: configPda,
+            authority: provider.wallet.publicKey,
+          })
+          .rpc();
+        expect.fail("wrong period must be rejected");
+      } catch (err: any) {
+        expect(errCode(err)).to.equal(6011);
+      }
+    });
   });
 
   // =========================================================================
@@ -469,6 +570,93 @@ describe("Alea Phase 2 — Localnet Integration", () => {
       expect(Buffer.from(retB64, "base64").toString("hex")).to.equal(
         ROUND_1_RANDOMNESS,
       );
+    });
+
+    it("T2.R CPI randomness = sha256(signature) — local byte-equality check", async () => {
+      // T2.R (Wave I) — extends P0#12 by computing sha256(sig) in the test
+      // and asserting byte-equality with the CPI return data. Makes the
+      // "randomness = sha256(sig)" contract (ADR 0036) testable locally
+      // without round-tripping through drand's published randomness.
+      const tx = await cpiConsumerProgram.methods
+        .consumeRandomness(new BN(1), Array.from(ROUND_1_SIG))
+        .accounts({
+          aleaProgram: aleaProgram.programId,
+          aleaConfig: configPda,
+          payer: provider.wallet.publicKey,
+        })
+        .preInstructions([CU_LIMIT_IX])
+        .rpc({ commitment: "confirmed", skipPreflight: true });
+
+      const info = await provider.connection.getTransaction(tx, {
+        commitment: "confirmed",
+        maxSupportedTransactionVersion: 0,
+      });
+      const [retB64] = (info!.meta as any).returnData.data as [string, string];
+      const returnedRandomness = Buffer.from(retB64, "base64");
+
+      // Locally compute sha256(signature) — the contract says this equals
+      // the returned randomness (ADR 0036: NOT keccak256).
+      const expectedRandomness = createHash("sha256")
+        .update(ROUND_1_SIG)
+        .digest();
+
+      expect(
+        returnedRandomness.toString("hex"),
+        "CPI return data MUST equal sha256(signature) per ADR 0036",
+      ).to.equal(expectedRandomness.toString("hex"));
+
+      // Belt-and-suspenders: also equal to drand's published randomness
+      // (end-to-end check remains green).
+      expect(returnedRandomness.toString("hex")).to.equal(ROUND_1_RANDOMNESS);
+    });
+
+    it("T2.V BeaconVerified event inside CPI carries outer signer as payer", async () => {
+      // T2.V (Wave I) — Alea emits BeaconVerified inside the CPI call. The
+      // event's `payer` field reflects ctx.accounts.payer.key() (the Signer
+      // account passed by cpi-consumer into the CPI accounts struct). In
+      // the P0#12 flow the outer signer (provider.wallet) IS that payer, so
+      // we assert the event surfaces it cleanly through the CPI boundary.
+      //
+      // If cpi-consumer were to swap in a PDA-derived signer for privacy
+      // (documented pattern in sdk/rust-cpi.md), event.payer would be the
+      // PDA instead — consumers need to know this to build indexers.
+      const tx = await cpiConsumerProgram.methods
+        .consumeRandomness(new BN(9337227), Array.from(ROUND_9337227_SIG))
+        .accounts({
+          aleaProgram: aleaProgram.programId,
+          aleaConfig: configPda,
+          payer: provider.wallet.publicKey,
+        })
+        .preInstructions([CU_LIMIT_IX])
+        .rpc({ commitment: "confirmed", skipPreflight: true });
+
+      const info = await provider.connection.getTransaction(tx, {
+        commitment: "confirmed",
+        maxSupportedTransactionVersion: 0,
+      });
+      const logs = info?.meta?.logMessages ?? [];
+
+      // BeaconVerified is emitted via `emit!` → Program data: <base64> log.
+      // Multiple Program data lines can exist when CPI chains emit events
+      // (cpi-consumer itself emits nothing today, but keep the filter
+      // robust by picking the first one and asserting its decoded type).
+      const programDataLog = logs.find((l) => l.startsWith("Program data:"));
+      expect(
+        programDataLog,
+        "T2.V: BeaconVerified must appear in outer tx logs even when emitted from a CPI",
+      ).to.not.be.undefined;
+
+      const coder = new anchor.BorshEventCoder(aleaIdl as anchor.Idl);
+      const payload = programDataLog!.replace("Program data: ", "");
+      const event = coder.decode(payload);
+      expect(event?.name).to.equal("BeaconVerified");
+      expect((event!.data as any).round.toString()).to.equal("9337227");
+      expect((event!.data as any).payer.toBase58()).to.equal(
+        provider.wallet.publicKey.toBase58(),
+      );
+      expect(
+        Buffer.from((event!.data as any).randomness).toString("hex"),
+      ).to.equal(ROUND_9337227_RANDOMNESS);
     });
 
     it("P1#15 seeds::program constraint rejects wrong config PDA (ADR 0034 smoke)", async () => {
