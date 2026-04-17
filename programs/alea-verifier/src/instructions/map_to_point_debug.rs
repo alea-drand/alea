@@ -8,9 +8,14 @@
 //!
 //! SECURITY POSTURE (see `instructions/mod.rs` for full rationale):
 //! stateless pure function, no authority check, no state mutation,
-//! computation freely available off-chain via gnark-crypto. Always
-//! present in shipped binary because Anchor 0.30.1 cannot cleanly
-//! cfg-gate a single instruction inside `#[program]`.
+//! computation freely available off-chain via gnark-crypto. This
+//! instruction is INTENTIONALLY always-present in the shipped binary
+//! — not feature-gated — because Anchor 0.30.1's `#[program]` macro
+//! emits client-account bindings that don't respect `cfg` on a single
+//! inner function, and carrying the instruction as always-on with zero
+//! attack surface is cleaner than maintaining two parallel `#[program]`
+//! modules. The `mod.rs` SECURITY POSTURE block documents the full
+//! risk analysis.
 //!
 //! Test harness (`tests/map-to-point-diff.ts`) calls this with the
 //! gnark-crypto-verified `u0_hex`/`u1_hex` values from the existing

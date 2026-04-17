@@ -69,6 +69,18 @@ fn fq_sub(a: &Fq, b: &Fq) -> Fq { *a - *b }
 
 #[cfg(not(target_os = "solana"))]
 fn try_sqrt_curve(x: &Fq) -> Option<Fq> {
+    // Stage 9 POSTFIX-T2-01 (P01 Opus) — symmetric zero-x guard.
+    // The BPF branch below rejects `x = 0` to close the T1.08 Agave
+    // short-circuit divergence. Without the matching guard here, native
+    // returns `Some(sqrt(3))` (3 is a QR in Fq since p ≡ 7 mod 12) while
+    // BPF returns `None` — asymmetric divergence at x = 0. Reachability
+    // under honest drand: 2⁻²⁵⁴ per candidate; polynomial under the new
+    // `map_to_point_debug` chosen-input instruction but no forgery path
+    // (debug instruction returns raw map_to_point output, not a verified
+    // beacon). Mirror the BPF guard so the two paths agree by construction.
+    if x.is_zero() {
+        return None;
+    }
     let gx = fq_add(&fq_mul(&fq_sq(x), x), &B); // x³ + 3
     gx.sqrt()
 }
