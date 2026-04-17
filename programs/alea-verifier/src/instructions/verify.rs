@@ -41,6 +41,18 @@ fn verify_beacon_full(
     signature: &[u8; 64],
     pubkey_g2: &[u8; 128],
 ) -> Result<[u8; 32]> {
+    // SECURITY: guard ordering is load-bearing. DO NOT REORDER.
+    // 1. round > 0 (cheapest; protects against drand genesis sentinel)
+    // 2. on_curve_g1 (canonical-form check BEFORE curve equation — CVE-
+    //    2025-30147 parallel pattern: subgroup/curve ordering inversion
+    //    allows bypass)
+    // 3. hash_round_to_g1 (pure; no attacker input reaches this)
+    // 4. pairing (only runs if prior guards passed)
+    // T2.Y — `config.pubkey_g2 == EXPECTED_EVMNET_PUBKEY` defense-in-
+    // depth considered and deliberately skipped: invariant already holds
+    // via ADR 0028 PDA-singleton + init-time guards; +200 CU per verify
+    // not justified by current attack surface. Reference: cross-model-
+    // delta.md + R3 decision #13.
     require!(round > 0, AleaError::RoundZero);                                 // 6002
     require!(on_curve_g1(signature), AleaError::InvalidG1Point);               // 6001
 
@@ -50,6 +62,12 @@ fn verify_beacon_full(
     // maps to AleaError::NoSquareRoot (6004), Err from g1_add syscall maps
     // to AleaError::PairingError (6006). ? propagates both.
     let m = hash_round_to_g1(round)?;
+
+    // T2.I — defense-in-depth: SVDW + hash_to_field + g1_add must produce
+    // on-curve output. debug_assert compiles out in release (zero CU cost)
+    // but catches any refactor-introduced regression in tests.
+    debug_assert!(on_curve_g1(&m), "SVDW invariant violated: hash_round_to_g1 returned off-curve point");
+
     let neg_m = negate_g1(&m);
 
     match verify_pairing(signature, &neg_m, pubkey_g2, &G2_GENERATOR) {

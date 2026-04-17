@@ -15,6 +15,23 @@ use super::svdw::{fq_from_be_bytes, fq_to_be_bytes};
 ///
 /// Runs on both native and BPF via ark-ff field ops (no ark-ec) — ~5
 /// field operations per call, acceptable CU cost on BPF.
+///
+/// # Subgroup check
+/// BN254 G1 has **cofactor = 1** — the prime-order subgroup equals the
+/// full curve (ark-bn254 defines `COFACTOR = 1` and
+/// `is_in_correct_subgroup_assuming_on_curve -> true`). Every on-curve
+/// G1 point is automatically in the correct subgroup, so NO explicit
+/// subgroup check is needed here (unlike G2, which has a large cofactor
+/// — see ADR 0027 fallback path).
+///
+/// This is critical: do NOT reorder the canonical-form check and the
+/// curve equation check. The canonical check (x < p, y < p) MUST run
+/// FIRST to reject non-reduced representations that would otherwise
+/// pass the curve equation mod p. This is the exact attack shape of
+/// CVE-2025-30147 (Besu, May 2025 — subgroup-before-on-curve bypass).
+///
+/// Sources: T2.X (P02-T2-02 + P03-T3-01). Also documented in PRESERVE.md
+/// items PRESERVE-09 + PRESERVE-14.
 pub fn on_curve_g1(bytes: &[u8; 64]) -> bool {
     // Parse as big-endian bigints WITHOUT field reduction
     let x_bytes: [u8; 32] = bytes[0..32].try_into().unwrap();
@@ -127,17 +144,16 @@ pub fn verify_pairing(
     input[192..256].copy_from_slice(neg_m);
     input[256..384].copy_from_slice(pubkey_g2);
 
+    // T2.P — explicit match distinguishing Some(true)/Some(false)/None.
+    // Length-not-32 (hypothetical future syscall ABI drift) routes to
+    // None → caller emits 6006 PairingError. This preserves the tri-state
+    // contract: "don't trust the answer, reset caller state" instead of
+    // misclassifying as 6000 InvalidSignature ("bad signature, retry").
     match alt_bn128_pairing(&input) {
-        Ok(result) => {
-            // Compare full 32 bytes against GT_ONE (T2.14 — catches ABI
-            // regressions if Solana ever changes output format).
-            if result.len() == 32 && result[..] == GT_ONE[..] {
-                Some(true)
-            } else {
-                Some(false)
-            }
-        }
-        Err(_) => None, // Infrastructure failure → caller emits PairingError (6006)
+        Ok(result) if result.len() != 32 => None, // infra surprise → 6006
+        Ok(result) if result[..] == GT_ONE[..] => Some(true),
+        Ok(_) => Some(false),                      // pairing result != GT_ONE
+        Err(_) => None,                            // syscall error → 6006
     }
 }
 
