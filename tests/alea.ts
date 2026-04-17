@@ -97,6 +97,19 @@ describe("Alea Phase 2 — Localnet Integration", () => {
     aleaProgram.programId,
   );
 
+  // Wave X+1 (Codex C HIGH, 2026-04-17) — ProgramData PDA for the Alea
+  // program, derived under BPFLoaderUpgradeable. The initialize handler
+  // requires this account so it can assert signer == upgrade_authority
+  // (closes FENDER-002 deploy-to-init front-run window at the program
+  // level).
+  const BPF_LOADER_UPGRADEABLE = new PublicKey(
+    "BPFLoaderUpgradeab1e11111111111111111111111",
+  );
+  const [programDataPda] = PublicKey.findProgramAddressSync(
+    [aleaProgram.programId.toBuffer()],
+    BPF_LOADER_UPGRADEABLE,
+  );
+
   // =========================================================================
   // initialize — tests 1-4 (happy / wrong chain_hash / wrong pubkey / dup)
   // =========================================================================
@@ -117,6 +130,7 @@ describe("Alea Phase 2 — Localnet Integration", () => {
           .accounts({
             config: configPda,
             authority: provider.wallet.publicKey,
+            programData: programDataPda,
             systemProgram: SystemProgram.programId,
           })
           .rpc();
@@ -142,6 +156,7 @@ describe("Alea Phase 2 — Localnet Integration", () => {
           .accounts({
             config: configPda,
             authority: provider.wallet.publicKey,
+            programData: programDataPda,
             systemProgram: SystemProgram.programId,
           })
           .rpc();
@@ -150,6 +165,48 @@ describe("Alea Phase 2 — Localnet Integration", () => {
         expect(errCode(err)).to.equal(
           6008,
           `Expected 6008 WrongPubkey, got: ${err?.message ?? err}`,
+        );
+      }
+    });
+
+    // Wave X+1 (Codex C HIGH, 2026-04-17) — T1.01 program-level fix.
+    // An unauthorized signer (not the program's upgrade_authority)
+    // calling initialize with the correct evmnet constants must be
+    // rejected with AleaError::UnauthorizedInit (6012). This closes
+    // the FENDER-002 deploy-to-init front-run window physically at
+    // the program level.
+    it("WAVE-X+1 initialize rejects non-upgrade-authority signer with 6012 UnauthorizedInit", async () => {
+      const attacker = Keypair.generate();
+      // Fund the attacker so it can pay tx fees + rent.
+      const sig = await provider.connection.requestAirdrop(
+        attacker.publicKey,
+        2_000_000_000,
+      );
+      await provider.connection.confirmTransaction(sig, "confirmed");
+
+      try {
+        await aleaProgram.methods
+          .initialize(
+            Array.from(EVMNET_PUBKEY),
+            EVMNET_GENESIS,
+            EVMNET_PERIOD,
+            Array.from(EVMNET_CHAIN_HASH),
+          )
+          .accounts({
+            config: configPda,
+            authority: attacker.publicKey,
+            programData: programDataPda,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([attacker])
+          .rpc();
+        expect.fail(
+          "Attacker (not upgrade_authority) must be rejected with 6012",
+        );
+      } catch (err: any) {
+        expect(errCode(err)).to.equal(
+          6012,
+          `Expected 6012 UnauthorizedInit, got: ${err?.message ?? err}`,
         );
       }
     });
@@ -165,6 +222,7 @@ describe("Alea Phase 2 — Localnet Integration", () => {
         .accounts({
           config: configPda,
           authority: provider.wallet.publicKey,
+          programData: programDataPda,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
@@ -201,6 +259,7 @@ describe("Alea Phase 2 — Localnet Integration", () => {
           .accounts({
             config: configPda,
             authority: provider.wallet.publicKey,
+            programData: programDataPda,
             systemProgram: SystemProgram.programId,
           })
           .rpc();
