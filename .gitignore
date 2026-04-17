@@ -40,3 +40,13 @@ scripts/collect-metrics.ts
 # Raw CU benchmark data — regeneratable via anchor test. validation-report.md
 # summarizes the stats; per-round data doesn't need to bloat the repo.
 validation-report-phase2-cu.json
+
+# Audit byproducts (Phase 2.5 Stage 1 static analysis output)
+.xray/
+programs/alea-verifier/programs_alea-verifier.ll
+
+# Subcrate cargo build outputs (root target/ already handled above with
+# idl-exception; this catches per-subcrate target/ dirs that cargo-build-sbf
+# and cargo fuzz produce for individual crates).
+programs/*/target/
+programs/*/fuzz/target/
