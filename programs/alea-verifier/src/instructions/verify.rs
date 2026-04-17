@@ -183,19 +183,44 @@ mod tests {
         assert_eq!(err_code(err), 6001, "off-curve sig must return AleaError::InvalidG1Point");
     }
 
+    // T1.09 — split the old `verify_corrupt_signature_bit_flip_rejected`
+    // into two tests that pin down EXACTLY one error code each. The old
+    // test accepted `code == 6000 || code == 6001` which was permissive
+    // enough to pass regardless of which branch the corrupt sig took —
+    // a regression that caused pairing to return Some(true) on invalid
+    // sigs (or inverted guard order) would still pass. Now:
+    //   * on-curve-but-wrong sig → MUST return exactly 6000
+    //   * off-curve bit flip     → MUST return exactly 6001
+    // Source: P10-T3-03 (Sonnet test coverage), Codex E CRITICAL (2,8).
+
     #[test]
-    fn verify_corrupt_signature_bit_flip_rejected() {
-        // Start with a valid on-curve sig, flip a single bit. The corrupted
-        // sig may still land on curve but will fail pairing, OR may go
-        // off-curve and fail on_curve_g1 first. Either way: not 6002, not Ok.
+    fn verify_on_curve_forgery_returns_6000_exact() {
+        // Use round-1 sig presented as round-2: the sig IS on-curve
+        // (passes on_curve_g1), but pairing fails because drand signed
+        // a different round. This is an "on-curve forgery" scenario —
+        // the only path to AleaError::InvalidSignature (6000).
+        let err = verify_beacon_full(2, &ROUND_1_SIG, &EXPECTED_EVMNET_PUBKEY)
+            .expect_err("on-curve forgery must fail pairing");
+        assert_eq!(
+            err_code(err),
+            6000,
+            "on-curve forgery must return EXACTLY InvalidSignature (6000), not 6001 or other"
+        );
+    }
+
+    #[test]
+    fn verify_off_curve_bit_flip_returns_6001_exact() {
+        // Flip the highest byte of x to force off-curve. Verified: this
+        // puts x > p OR leaves x on-canonical but makes y² != x³ + 3.
+        // Either way: on_curve_g1 rejects at 6001 BEFORE reaching pairing.
         let mut sig = ROUND_1_SIG;
         sig[0] ^= 0xFF;
         let err = verify_beacon_full(1, &sig, &EXPECTED_EVMNET_PUBKEY)
-            .expect_err("corrupt sig must fail");
-        let code = err_code(err);
-        assert!(
-            code == 6000 || code == 6001,
-            "corrupt sig must return InvalidSignature (6000) or InvalidG1Point (6001), got {code}"
+            .expect_err("off-curve bit flip must fail");
+        assert_eq!(
+            err_code(err),
+            6001,
+            "off-curve bit flip must return EXACTLY InvalidG1Point (6001)"
         );
     }
 
@@ -205,5 +230,36 @@ mod tests {
         let err = verify_beacon_full(2, &ROUND_1_SIG, &EXPECTED_EVMNET_PUBKEY)
             .expect_err("wrong round must fail pairing");
         assert_eq!(err_code(err), 6000, "wrong round must return AleaError::InvalidSignature");
+    }
+
+    // T2.S — u64::MAX round boundary. Codex E HIGH (1). Submits the
+    // maximum u64 round value with round-1 sig; drand never signed this
+    // round, so pairing must fail with 6000. Proves Alea handles the
+    // numeric upper bound without overflow/panic.
+    #[test]
+    fn verify_u64_max_round_with_wrong_sig_returns_6000() {
+        let err = verify_beacon_full(u64::MAX, &ROUND_1_SIG, &EXPECTED_EVMNET_PUBKEY)
+            .expect_err("u64::MAX round with round-1 sig must fail pairing");
+        assert_eq!(
+            err_code(err),
+            6000,
+            "u64::MAX round must return InvalidSignature (6000) — numeric boundary handled"
+        );
+    }
+
+    // T2.CC — explicit replay safety test. Codex E LOW (12). The suite
+    // calls round 1 multiple times across tests, implying stateless
+    // replay-safety, but no test intentionally asserts this as a
+    // PROPERTY. Now it does: same round twice → same 32-byte randomness.
+    #[test]
+    fn verify_same_round_twice_returns_identical_randomness() {
+        let r1 = verify_beacon_full(1, &ROUND_1_SIG, &EXPECTED_EVMNET_PUBKEY)
+            .expect("first verify must succeed");
+        let r2 = verify_beacon_full(1, &ROUND_1_SIG, &EXPECTED_EVMNET_PUBKEY)
+            .expect("second verify must succeed");
+        assert_eq!(
+            r1, r2,
+            "Alea verify is stateless + replay-safe: same (round, sig) MUST produce byte-identical randomness"
+        );
     }
 }
