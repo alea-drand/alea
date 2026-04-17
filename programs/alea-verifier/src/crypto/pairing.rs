@@ -227,6 +227,58 @@ fn bytes_to_bigint(bytes: &[u8; 32]) -> BigInteger256 {
 }
 
 #[cfg(test)]
+mod bytes_to_bigint_tests {
+    use super::bytes_to_bigint;
+    use ark_ff::BigInteger256;
+
+    // P04-T3-03 (Phase 2.5 Wave I, Bucket A) — direct unit test for the
+    // bytes_to_bigint helper. Previously exercised only indirectly via
+    // G1/G2 deserialization paths; adding a direct test pins the BE-to-
+    // limbs mapping explicitly so any change to the limb-ordering
+    // convention surfaces immediately.
+    #[test]
+    fn bytes_to_bigint_zero() {
+        let bytes = [0u8; 32];
+        let bi = bytes_to_bigint(&bytes);
+        assert_eq!(bi, BigInteger256::new([0u64; 4]));
+    }
+
+    #[test]
+    fn bytes_to_bigint_one() {
+        // BE encoding of 1 = [0..0, 0x01]
+        let mut bytes = [0u8; 32];
+        bytes[31] = 0x01;
+        let bi = bytes_to_bigint(&bytes);
+        assert_eq!(bi, BigInteger256::new([1, 0, 0, 0]),
+            "BE bytes [..., 0x01] must produce limbs [1, 0, 0, 0]");
+    }
+
+    #[test]
+    fn bytes_to_bigint_limb_boundary() {
+        // Value 2^64 = one past the first limb — BE bytes have 0x01 at byte 23.
+        let mut bytes = [0u8; 32];
+        bytes[23] = 0x01;
+        let bi = bytes_to_bigint(&bytes);
+        assert_eq!(bi, BigInteger256::new([0, 1, 0, 0]),
+            "BE byte 23 = 0x01 represents 2^64 — must land in limb[1]");
+    }
+
+    #[test]
+    fn bytes_to_bigint_distinct_limbs() {
+        // Each limb gets a unique non-zero byte so any cross-limb bug
+        // (off-by-one, swap, reverse) visibly corrupts the expected pattern.
+        let mut bytes = [0u8; 32];
+        bytes[31] = 0xAA; // limb 0 low byte
+        bytes[23] = 0xBB; // limb 1 low byte
+        bytes[15] = 0xCC; // limb 2 low byte
+        bytes[7]  = 0xDD; // limb 3 low byte
+        let bi = bytes_to_bigint(&bytes);
+        assert_eq!(bi, BigInteger256::new([0xAA, 0xBB, 0xCC, 0xDD]),
+            "cross-limb BE decoding preserves per-limb LSB at byte offsets 31/23/15/7");
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use hex_literal::hex;
