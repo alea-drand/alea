@@ -65,4 +65,35 @@ mod tests {
         assert_eq!(hex::encode(&m[0..32]), "1626082c3dd0751bdaaf8c3e709b5dd7cdedf45d4e81a5aa3e270f1e78924b32");
         assert_eq!(hex::encode(&m[32..64]), "2bf29ab3af54dfe3c053ad4efa93db05d3586368463e9d7334c7ba61f6f4e955");
     }
+
+    // P10-T3-04 (Phase 2.5 Wave I, Bucket A) — round-bytes endianness pin.
+    // drand evmnet signs keccak256(round_as_u64_be_bytes). An accidental
+    // switch to little-endian (.to_le_bytes) would produce a completely
+    // different keccak hash, completely different SVDW output, completely
+    // different G1 point — and a non-verifying signature. Test pins the
+    // BE convention explicitly.
+    #[test]
+    fn hash_round_to_g1_uses_big_endian_round_bytes() {
+        // Round 1 u64 big-endian = 00 00 00 00 00 00 00 01
+        // keccak256 of that = 6c31fc15422ebad28aaf9089c306702f67540b53c7eea8b7d2941044b027100f
+        // This value is committed as msg_hash_keccak256_hex in
+        // build-spec/testing/fixtures/round-1.json (gnark-verified).
+        let round_bytes = 1u64.to_be_bytes();
+        assert_eq!(round_bytes, [0, 0, 0, 0, 0, 0, 0, 1],
+            "round 1 BE bytes must be [0,0,0,0,0,0,0,1] (LE would be [1,0,0,0,0,0,0,0])");
+
+        let msg_hash = anchor_lang::solana_program::keccak::hash(&round_bytes);
+        assert_eq!(
+            hex::encode(msg_hash.as_ref()),
+            "6c31fc15422ebad28aaf9089c306702f67540b53c7eea8b7d2941044b027100f",
+            "keccak256(1_u64_be) must match fixture; LE encoding would produce a different hash",
+        );
+
+        // Sanity: the same round via the public API produces a G1 point
+        // matching the fixture's hash_to_curve output (end-to-end BE check).
+        let m = hash_round_to_g1(1).expect("round 1 must succeed");
+        assert_eq!(hex::encode(&m[0..32]),
+            "073d3d00a1c3ca588db79d44202e44b2f45995ddd39e705717c9edfcb79e4371",
+            "round 1 M.x via BE path must match fixture");
+    }
 }
