@@ -108,10 +108,22 @@ fn try_sqrt_curve(x: &Fq) -> Option<Fq> {
     }
 }
 
-/// SVDW map_to_point: maps a field element to a BN254 G1 point
-/// Port of kevincharm/bls-bn254 BLS.sol mapToPoint()
-/// Returns 64 big-endian bytes (x || y)
-pub fn map_to_point(u: &Fq) -> [u8; 64] {
+/// SVDW map_to_point: maps a field element to a BN254 G1 point.
+/// Port of kevincharm/bls-bn254 BLS.sol mapToPoint().
+///
+/// Returns 64 big-endian bytes (x || y) on success, or `None` if all
+/// three SVDW candidates (x1, x2, x3) fail try_sqrt_curve. Per RFC 9380
+/// Appendix F.2.1 + the BN254 SVDW theorem, at least one candidate is
+/// always a quadratic residue for any valid `u` — so `None` in practice
+/// signals a syscall oracle regression or corrupt SVDW constant (both
+/// of which Alea's test suite guards against via fixtures + const
+/// sanity checks).
+///
+/// T1.05 — refactored from `-> [u8; 64]` with `.expect()` on x3 to
+/// `-> Option<[u8; 64]>` with `?` propagation. Caller (hash_to_g1) maps
+/// None to `AleaError::NoSquareRoot` (6004) via `ok_or`. This converts
+/// a BPF panic into a structured on-chain error code.
+pub fn map_to_point(u: &Fq) -> Option<[u8; 64]> {
     // Steps 1-4: compute tv1, tv2
     let tv1_inner = fq_mul(&fq_sq(u), &C1); // u² * g(Z)
     let tv2 = fq_add(&Fq::ONE, &tv1_inner); // 1 + u²*g(Z)
@@ -132,13 +144,14 @@ pub fn map_to_point(u: &Fq) -> [u8; 64] {
     let tv8 = fq_mul(&tv7, &tv3);
     let x3 = fq_add(&Z, &fq_mul(&C4, &fq_sq(&tv8)));
 
-    // Select candidate: try x1, then x2, then x3
+    // Select candidate: try x1, then x2, then x3. If x3 also fails
+    // (theorem violation), propagate None to the caller.
     let (selected_x, mut y) = if let Some(y1) = try_sqrt_curve(&x1) {
         (x1, y1)
     } else if let Some(y2) = try_sqrt_curve(&x2) {
         (x2, y2)
     } else {
-        let y3 = try_sqrt_curve(&x3).expect("SVDW guarantees x3 is always valid");
+        let y3 = try_sqrt_curve(&x3)?;
         (x3, y3)
     };
 
@@ -151,7 +164,7 @@ pub fn map_to_point(u: &Fq) -> [u8; 64] {
     let mut result = [0u8; 64];
     result[0..32].copy_from_slice(&fq_to_be_bytes(&selected_x));
     result[32..64].copy_from_slice(&fq_to_be_bytes(&y));
-    result
+    Some(result)
 }
 
 // ============================================================================
@@ -159,9 +172,20 @@ pub fn map_to_point(u: &Fq) -> [u8; 64] {
 // ============================================================================
 // Native: ark-ec affine addition (for tests).
 // BPF:    alt_bn128_addition syscall (334 CU).
+//
+// T1.05 — signature changed from `-> [u8; 64]` (with .expect() on BPF
+// syscall result) to `-> anchor_lang::prelude::Result<[u8; 64]>` with
+// explicit Err propagation. Native path still infallible in practice but
+// wrapped in Ok(...) for signature uniformity. BPF syscall Err maps to
+// AleaError::PairingError (6006). Converts a potential opaque BPF panic
+// into a structured on-chain error code.
+//
+// Pre-Phase 4 note: `g1_add` is `pub` (part of crypto library surface),
+// but not part of ADR 0028 CPI interface contract (which is instruction-
+// level). No external consumers exist before Phase 4 SDK publication.
 
 #[cfg(not(target_os = "solana"))]
-pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> [u8; 64] {
+pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> anchor_lang::prelude::Result<[u8; 64]> {
     use ark_bn254::G1Affine;
     let x1 = fq_from_be_bytes(p1[0..32].try_into().unwrap());
     let y1 = fq_from_be_bytes(p1[32..64].try_into().unwrap());
@@ -176,22 +200,23 @@ pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> [u8; 64] {
     let mut result = [0u8; 64];
     result[0..32].copy_from_slice(&fq_to_be_bytes(&sum.x));
     result[32..64].copy_from_slice(&fq_to_be_bytes(&sum.y));
-    result
+    Ok(result)
 }
 
 #[cfg(target_os = "solana")]
-pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> [u8; 64] {
+pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> anchor_lang::prelude::Result<[u8; 64]> {
     use anchor_lang::solana_program::alt_bn128::prelude::alt_bn128_addition;
+    use crate::errors::AleaError;
 
     let mut input = [0u8; 128];
     input[0..64].copy_from_slice(p1);
     input[64..128].copy_from_slice(p2);
 
     let result = alt_bn128_addition(&input)
-        .expect("alt_bn128_addition: inputs already validated as on-curve G1");
+        .map_err(|_| AleaError::PairingError)?;
     let mut out = [0u8; 64];
     out.copy_from_slice(&result[..64]);
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -240,8 +265,8 @@ mod tests {
             "0b2f337436437aef114e4f8383ac665c24fe4d3f88b3c53d494ad4104b9d15eb"
         ));
 
-        let q0 = map_to_point(&u0);
-        let q1 = map_to_point(&u1);
+        let q0 = map_to_point(&u0).expect("round 1 u0 must succeed (SVDW theorem)");
+        let q1 = map_to_point(&u1).expect("round 1 u1 must succeed (SVDW theorem)");
 
         // T1.03 — individual Q0 / Q1 byte-for-byte assertions against
         // gnark-crypto fixtures (round-1.json:30-33). The sum assertion
@@ -261,10 +286,7 @@ mod tests {
             "21e341fa458ee12634b567e980ff1561fba99ef9e6858e30373b2bb5b3fb2ccf",
             "Round 1 Q1.y must match gnark-crypto MapToG1");
 
-        let m = g1_add(
-            <&[u8; 64]>::try_from(q0.as_ref()).unwrap(),
-            <&[u8; 64]>::try_from(q1.as_ref()).unwrap(),
-        );
+        let m = g1_add(&q0, &q1).expect("g1_add must succeed for on-curve inputs");
 
         let m_x_hex = hex::encode(&m[0..32]);
         let m_y_hex = hex::encode(&m[32..64]);
@@ -284,8 +306,8 @@ mod tests {
             "1da61ba0e660ae1d421c04d6aa2a5d69b24a1a1d380d01b464bdf315b080e781"
         ));
 
-        let q0 = map_to_point(&u0);
-        let q1 = map_to_point(&u1);
+        let q0 = map_to_point(&u0).expect("round 9337227 u0 must succeed (SVDW theorem)");
+        let q1 = map_to_point(&u1).expect("round 9337227 u1 must succeed (SVDW theorem)");
 
         // T1.03 — individual Q0 / Q1 byte-for-byte assertions against
         // gnark-crypto fixtures (round-9337227.json:30-33).
@@ -302,10 +324,7 @@ mod tests {
             "1116342a64c29038836c8b7b8c1270ca8af9535ca542a0aee6d6b82855157ad3",
             "Round 9337227 Q1.y must match gnark-crypto MapToG1");
 
-        let m = g1_add(
-            <&[u8; 64]>::try_from(q0.as_ref()).unwrap(),
-            <&[u8; 64]>::try_from(q1.as_ref()).unwrap(),
-        );
+        let m = g1_add(&q0, &q1).expect("g1_add must succeed for on-curve inputs");
 
         let m_x_hex = hex::encode(&m[0..32]);
         let m_y_hex = hex::encode(&m[32..64]);
@@ -319,8 +338,7 @@ mod tests {
     #[test]
     fn map_to_point_u_zero() {
         let u = Fq::ZERO;
-        let result = map_to_point(&u);
-        // Must produce a valid G1 point without panic
+        let result = map_to_point(&u).expect("u=0 must succeed (one of x_i is a QR by SVDW theorem)");
         let x = fq_from_be_bytes(result[0..32].try_into().unwrap());
         let y = fq_from_be_bytes(result[32..64].try_into().unwrap());
         assert_eq!(y.square(), x.square() * x + Fq::from(3u64), "u=0 result must be on curve");
@@ -329,7 +347,7 @@ mod tests {
     #[test]
     fn map_to_point_u_one() {
         let u = Fq::ONE;
-        let result = map_to_point(&u);
+        let result = map_to_point(&u).expect("u=1 must succeed");
         let x = fq_from_be_bytes(result[0..32].try_into().unwrap());
         let y = fq_from_be_bytes(result[32..64].try_into().unwrap());
         assert_eq!(y.square(), x.square() * x + Fq::from(3u64), "u=1 result must be on curve");
@@ -338,7 +356,7 @@ mod tests {
     #[test]
     fn map_to_point_u_p_minus_1() {
         let u = -Fq::ONE; // p-1
-        let result = map_to_point(&u);
+        let result = map_to_point(&u).expect("u=p-1 must succeed");
         let x = fq_from_be_bytes(result[0..32].try_into().unwrap());
         let y = fq_from_be_bytes(result[32..64].try_into().unwrap());
         assert_eq!(y.square(), x.square() * x + Fq::from(3u64), "u=p-1 result must be on curve");

@@ -59,9 +59,16 @@ pub fn negate_g1(point: &[u8; 64]) -> [u8; 64] {
 //   σ(64) || G2_gen(128) || neg_m(64) || pubkey(128)
 
 /// Full BLS verification: verify drand beacon and return randomness.
-/// Native test helper — returns `None` on any failure (invalid signature,
-/// off-curve, or pairing infrastructure error). The Anchor `verify`
-/// handler uses the primitives directly so it can emit distinct error codes.
+///
+/// T2.O — marked `#[cfg(test)]` so this helper cannot be accidentally
+/// called from production code. The Anchor `verify` handler uses the
+/// primitives directly so it can emit distinct error codes (6000/6001/
+/// 6006) instead of collapsing all failures into `None`.
+///
+/// T1.05 — hash_round_to_g1 now returns Result; we convert Err to None
+/// here to preserve the test-helper's documented "None on any failure"
+/// behavior.
+#[cfg(test)]
 pub fn verify_beacon(round: u64, signature: &[u8; 64], pubkey_g2: &[u8; 128]) -> Option<[u8; 32]> {
     // Step 1: validate signature is on curve
     if !on_curve_g1(signature) {
@@ -69,7 +76,7 @@ pub fn verify_beacon(round: u64, signature: &[u8; 64], pubkey_g2: &[u8; 128]) ->
     }
 
     // Step 2: hash round to G1 message point
-    let m = hash_round_to_g1(round);
+    let m = hash_round_to_g1(round).ok()?;
 
     // Step 3: negate M for pairing check
     let neg_m = negate_g1(&m);
