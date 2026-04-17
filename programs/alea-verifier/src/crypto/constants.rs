@@ -179,6 +179,33 @@ mod tests {
         assert_eq!(G2_GENERATOR.len(), 128);
     }
 
+    // P10-T3-05 — G2_GENERATOR mathematical correctness. A single wrong
+    // byte here would cause every pairing to return false silently —
+    // program appears to work but rejects all valid signatures. Native
+    // test (requires ark-ec; cfg'd out of BPF binary automatically via
+    // Cargo resolution for native target).
+    #[test]
+    fn g2_generator_is_on_curve_and_in_subgroup() {
+        use ark_bn254::{Fq as ArkFq, Fq2, G2Affine};
+        use ark_ec::AffineRepr;
+
+        // EIP-197 G2 encoding: x_c1 || x_c0 || y_c1 || y_c0, each 32 BE bytes.
+        let x_c1 = ArkFq::from_be_bytes_mod_order(&G2_GENERATOR[0..32]);
+        let x_c0 = ArkFq::from_be_bytes_mod_order(&G2_GENERATOR[32..64]);
+        let y_c1 = ArkFq::from_be_bytes_mod_order(&G2_GENERATOR[64..96]);
+        let y_c0 = ArkFq::from_be_bytes_mod_order(&G2_GENERATOR[96..128]);
+
+        let x = Fq2::new(x_c0, x_c1);
+        let y = Fq2::new(y_c0, y_c1);
+        let point = G2Affine::new_unchecked(x, y);
+
+        assert!(point.is_on_curve(), "G2_GENERATOR must be on BN254 G2 curve");
+        assert!(
+            point.is_in_correct_subgroup_assuming_on_curve(),
+            "G2_GENERATOR must be in BN254 G2 prime-order subgroup"
+        );
+    }
+
     #[test]
     fn evmnet_pubkey_length() {
         assert_eq!(EXPECTED_EVMNET_PUBKEY.len(), 128);

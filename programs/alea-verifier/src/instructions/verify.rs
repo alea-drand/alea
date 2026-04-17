@@ -262,4 +262,48 @@ mod tests {
             "Alea verify is stateless + replay-safe: same (round, sig) MUST produce byte-identical randomness"
         );
     }
+
+    // T1.11 — partial native coverage for PairingError (6006). The BPF
+    // tri-state None branch in verify_pairing can only be triggered via
+    // a real syscall Err (Agave / Firedancer infrastructure failure);
+    // native verify_pairing always returns Some(bool). This test pins
+    // the error-code mapping at the type level: if err_code() ever
+    // returns something other than 6006 for AleaError::PairingError,
+    // something in the Anchor macro or error numbering drifted. Proves
+    // the CPI contract (consumer SDKs) is stable for 6006.
+    //
+    // Full BPF integration test (forcing real syscall Err) lives in
+    // Wave G TS test suite and exercises the runtime path. Source:
+    // P10-T1-01, Codex E HIGH (8).
+    #[test]
+    fn pairing_error_6006_code_mapping_stable() {
+        let err: anchor_lang::error::Error = AleaError::PairingError.into();
+        assert_eq!(
+            err_code(err),
+            6006,
+            "AleaError::PairingError MUST map to numeric code 6006 per ADR 0028 CPI interface"
+        );
+
+        // Also pin 6004 NoSquareRoot (activated by T1.05 panic→Result)
+        let err: anchor_lang::error::Error = AleaError::NoSquareRoot.into();
+        assert_eq!(
+            err_code(err),
+            6004,
+            "AleaError::NoSquareRoot MUST map to numeric code 6004 per ADR 0028"
+        );
+
+        // Also pin 6010/6011 added in T2.E (Wave E)
+        let err: anchor_lang::error::Error = AleaError::InvalidGenesisTime.into();
+        assert_eq!(
+            err_code(err),
+            6010,
+            "AleaError::InvalidGenesisTime MUST map to numeric code 6010"
+        );
+        let err: anchor_lang::error::Error = AleaError::InvalidPeriod.into();
+        assert_eq!(
+            err_code(err),
+            6011,
+            "AleaError::InvalidPeriod MUST map to numeric code 6011"
+        );
+    }
 }
