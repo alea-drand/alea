@@ -85,4 +85,20 @@ pub enum AleaError {
     InvalidPeriod,              // 6011 — T2.E (Wave E): byte-equality guard
                                 //  against evmnet constant. Appended per
                                 //  ADR 0028 append-only rule.
+
+    #[msg("initialize authority must equal the program's upgrade_authority_address")]
+    UnauthorizedInit,           // 6012 — Wave X+1 (Codex Session C HIGH,
+                                //  2026-04-17): FENDER-002 hardening at
+                                //  the program level. The `initialize`
+                                //  handler requires the signer's pubkey
+                                //  to equal the BPFLoaderUpgradeable
+                                //  ProgramData.upgrade_authority_address,
+                                //  closing the deploy-to-init front-run
+                                //  window that the prior `scripts/
+                                //  initialize.ts` operational mitigation
+                                //  could not close (Solana cannot bundle
+                                //  program deploy + first-init in a
+                                //  single tx — deploy is itself multi-tx
+                                //  upload). Appended per ADR 0028
+                                //  append-only rule.
 }

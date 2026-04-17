@@ -90,10 +90,23 @@ async function main() {
     program.programId,
   );
 
+  // Wave X+1 (Codex C HIGH, 2026-04-17) — ProgramData PDA under the
+  // BPFLoaderUpgradeable program. The on-chain initialize handler
+  // requires this account so it can assert signer == upgrade_authority,
+  // closing the FENDER-002 deploy-to-init front-run window.
+  const BPF_LOADER_UPGRADEABLE = new PublicKey(
+    "BPFLoaderUpgradeab1e11111111111111111111111",
+  );
+  const [programDataPda] = PublicKey.findProgramAddressSync(
+    [program.programId.toBuffer()],
+    BPF_LOADER_UPGRADEABLE,
+  );
+
   console.log(`[initialize] Program ID:     ${program.programId.toBase58()}`);
   console.log(`[initialize] Cluster:        ${provider.connection.rpcEndpoint}`);
   console.log(`[initialize] Authority:      ${authority.publicKey.toBase58()}`);
   console.log(`[initialize] Config PDA:     ${configPda.toBase58()} (bump ${configBump})`);
+  console.log(`[initialize] ProgramData:    ${programDataPda.toBase58()}`);
 
   // -------------------------------------------------------------------------
   // Pre-flight: Config PDA existence check
@@ -136,6 +149,7 @@ async function main() {
     .accountsStrict({
       config: configPda,
       authority: authority.publicKey,
+      programData: programDataPda,
       systemProgram: SystemProgram.programId,
     })
     .instruction();

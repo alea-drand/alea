@@ -45,6 +45,25 @@
           "signer": true
         },
         {
+          "name": "program_data",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  138, 166, 28, 129, 68, 133, 59, 101, 39, 200, 248, 154, 133, 95, 3, 0, 89, 112, 175, 136, 180, 53, 94, 82, 150, 253, 10, 49, 230, 191, 42, 121
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                2, 168, 246, 145, 78, 136, 161, 176, 226, 16, 21, 62, 247, 99, 174, 43, 0, 194, 185, 61, 22, 193, 36, 210, 192, 83, 122, 16, 4, 128, 0, 0
+              ]
+            }
+          }
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
@@ -345,6 +364,11 @@
       "code": 6011,
       "name": "InvalidPeriod",
       "msg": "period does not match EXPECTED_EVMNET_PERIOD"
+    },
+    {
+      "code": 6012,
+      "name": "UnauthorizedInit",
+      "msg": "initialize authority must equal the program's upgrade_authority_address"
     }
   ],
   "types": [
