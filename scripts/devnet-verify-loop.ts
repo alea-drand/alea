@@ -181,13 +181,25 @@ async function runLiveLoop(flags: Flags): Promise<RoundResult[]> {
       .preInstructions([CU_LIMIT_IX])
       .rpc({ commitment: "finalized", skipPreflight: true });
 
-    const info = await provider.connection.getTransaction(txSig, {
-      commitment: "finalized",
-      maxSupportedTransactionVersion: 0,
-    });
-    if (info?.meta?.err !== null) {
+    // Retry getTransaction: Helius devnet indexer sometimes lags 2-5s
+    // behind the `.rpc()` finalized confirmation. Poll up to 15s.
+    let info = null;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      info = await provider.connection.getTransaction(txSig, {
+        commitment: "confirmed",
+        maxSupportedTransactionVersion: 0,
+      });
+      if (info) break;
+      await sleep(1000);
+    }
+    if (!info) {
       throw new Error(
-        `round ${round} tx failed on-chain: ${JSON.stringify(info?.meta?.err)}`,
+        `round ${round} getTransaction returned null after 15s for sig ${txSig}`,
+      );
+    }
+    if (info.meta?.err !== null && info.meta?.err !== undefined) {
+      throw new Error(
+        `round ${round} tx failed on-chain: ${JSON.stringify(info.meta.err)}`,
       );
     }
 
@@ -249,11 +261,48 @@ function computeStats(cuValues: number[]) {
 // ---------------------------------------------------------------------------
 
 function errCode(err: any): number | undefined {
-  return (
+  // Anchor-wrapped error
+  const anchor =
     err?.error?.errorCode?.number ??
     err?.errorCode?.number ??
-    err?.code
-  );
+    (typeof err?.code === "number" ? err.code : undefined);
+  if (typeof anchor === "number") return anchor;
+  // Raw Solana InstructionError: { InstructionError: [ixIdx, { Custom: N }] }
+  const ie = err?.InstructionError;
+  if (Array.isArray(ie) && ie.length === 2) {
+    const inner = ie[1];
+    if (inner && typeof inner === "object" && typeof inner.Custom === "number") {
+      return inner.Custom;
+    }
+  }
+  return undefined;
+}
+
+function extractSig(err: any): string | undefined {
+  // Anchor wraps SendTransactionError; the signature may be on various paths
+  return err?.signature ?? err?.txid ?? err?.transactionSignature;
+}
+
+// If the tx landed (got a signature) but failed on-chain, the error code is in
+// the log messages. Example log: "Program log: AnchorError thrown ... Error Code: RoundZero. Error Number: 6002"
+async function extractCodeFromFailedTx(err: any): Promise<number | undefined> {
+  let logs: any = err?.logs;
+  if (!Array.isArray(logs)) {
+    try {
+      const maybe = typeof err?.getLogs === "function" ? await err.getLogs() : undefined;
+      if (Array.isArray(maybe)) logs = maybe;
+      else logs = [];
+    } catch {
+      logs = [];
+    }
+  }
+  for (const line of logs) {
+    const m = String(line).match(/Error Number: (\d+)/);
+    if (m) return parseInt(m[1], 10);
+    const m2 = String(line).match(/custom program error: 0x([0-9a-fA-F]+)/);
+    if (m2) return parseInt(m2[1], 16);
+  }
+  return undefined;
 }
 
 interface FailureCaseResult {
@@ -291,9 +340,10 @@ async function runFailureCases(): Promise<FailureCaseResult[]> {
       .rpc({ commitment: "finalized", skipPreflight: true });
     case1.actualCode = "NO_ERROR";
   } catch (err: any) {
-    case1.actualCode = errCode(err) ?? "unknown";
-    case1.signature = err?.signature;
+    case1.actualCode = errCode(err) ?? (await extractCodeFromFailedTx(err)) ?? "unknown";
+    case1.signature = err?.signature ?? extractSig(err);
     if (case1.signature) case1.explorer = explorerUrl(case1.signature);
+    if (case1.actualCode === "unknown") console.log("  DEBUG case1 err keys:", Object.keys(err || {}), "msg:", err?.message?.slice(0, 200));
   }
   case1.passed = case1.actualCode === 6002;
   console.log(
@@ -316,9 +366,14 @@ async function runFailureCases(): Promise<FailureCaseResult[]> {
       .rpc({ commitment: "finalized", skipPreflight: true });
     case2.actualCode = "NO_ERROR";
   } catch (err: any) {
-    case2.actualCode = errCode(err) ?? "unknown";
-    case2.signature = err?.signature;
+    case2.actualCode = errCode(err) ?? (await extractCodeFromFailedTx(err)) ?? "unknown";
+    case2.signature = err?.signature ?? extractSig(err);
     if (case2.signature) case2.explorer = explorerUrl(case2.signature);
+    if (case2.actualCode === "unknown") {
+      console.log("  DEBUG case2 err keys:", Object.keys(err || {}));
+      console.log("  DEBUG case2 err JSON:", JSON.stringify(err, null, 2).slice(0, 900));
+      console.log("  DEBUG case2 err.logs?", err?.logs?.slice(0, 20));
+    }
   }
   case2.passed = case2.actualCode === 6000;
   console.log(
