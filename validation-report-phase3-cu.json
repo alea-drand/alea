@@ -1,0 +1,63 @@
+{
+  "stats": {
+    "n": 7,
+    "min": 404039,
+    "p50": 406487,
+    "mean": 406272,
+    "p95": 409120,
+    "max": 409120,
+    "stddev": 1558,
+    "variancePctOfMean": 0.38351416028578417
+  },
+  "results": [
+    {
+      "round": 16341912,
+      "signature": "otNX3H3XtHWJKCUda78pMj32sTWJYqZK6cEhKQgcLFFZdn4YmHmDqwQe1LN2ryAyeKAFVdffPu3wBhVWCuGX4dQ",
+      "cu": 404039,
+      "randomnessHex": "ba5d3c452830541050f45f39bfe8f1d8723e989d5ad5e7e2b04687f4daf66d79",
+      "explorer": "https://explorer.solana.com/tx/otNX3H3XtHWJKCUda78pMj32sTWJYqZK6cEhKQgcLFFZdn4YmHmDqwQe1LN2ryAyeKAFVdffPu3wBhVWCuGX4dQ?cluster=devnet"
+    },
+    {
+      "round": 16341913,
+      "signature": "4aVHP3ZkHSTR3BhA2r4VLF7FFVF5pqJj4p7aC1GSaA8DEK8kxxhEMfUve8LEtYu9sNaZuLnzYc3Qng9PpFaT2vmz",
+      "cu": 406896,
+      "randomnessHex": "f453bee8b17bcb23f993e82d07ff3feae92cd0103782763e2627e24627eb9526",
+      "explorer": "https://explorer.solana.com/tx/4aVHP3ZkHSTR3BhA2r4VLF7FFVF5pqJj4p7aC1GSaA8DEK8kxxhEMfUve8LEtYu9sNaZuLnzYc3Qng9PpFaT2vmz?cluster=devnet"
+    },
+    {
+      "round": 16341914,
+      "signature": "3H9vDaAiSM78RSv4mqohadZC8pPsQR8rxV2KJbxwE3XPirrozZEveLfJHqoKiNwYywVRqVuKheSKBnWuhgdhydx6",
+      "cu": 406638,
+      "randomnessHex": "e864781b46836e9b2e61bb118ab38ef186b9330f0a651c23698866d9757956e1",
+      "explorer": "https://explorer.solana.com/tx/3H9vDaAiSM78RSv4mqohadZC8pPsQR8rxV2KJbxwE3XPirrozZEveLfJHqoKiNwYywVRqVuKheSKBnWuhgdhydx6?cluster=devnet"
+    },
+    {
+      "round": 16341915,
+      "signature": "7KTwYYLrSEBX8ofSYYBJM29UZxYLZf2Na3M3SH4ctM1CZ9pbemvp8opKYCheaKygFiMoxwqmdEjZAAz9sGGQCTq",
+      "cu": 406273,
+      "randomnessHex": "878d8af766d02c2ad5d555f984a98aa12ea2affe172663bfd56adbb3127b8b5b",
+      "explorer": "https://explorer.solana.com/tx/7KTwYYLrSEBX8ofSYYBJM29UZxYLZf2Na3M3SH4ctM1CZ9pbemvp8opKYCheaKygFiMoxwqmdEjZAAz9sGGQCTq?cluster=devnet"
+    },
+    {
+      "round": 16341916,
+      "signature": "5Chq8o8EtzmJ8qhNxqUqM1hYS5JMvBoLRTBe2oSUAHG6tTVwEjFcyE7o38pjSYtaD8K3syxADhEpXVsvjzUtrkgh",
+      "cu": 404448,
+      "randomnessHex": "b42ecff2c35ffbabe0ffc6c79b758886c5b09a68bb5261e2e1b648c8b7825bde",
+      "explorer": "https://explorer.solana.com/tx/5Chq8o8EtzmJ8qhNxqUqM1hYS5JMvBoLRTBe2oSUAHG6tTVwEjFcyE7o38pjSYtaD8K3syxADhEpXVsvjzUtrkgh?cluster=devnet"
+    },
+    {
+      "round": 16341917,
+      "signature": "43HqXoTsaWfmUkXNGh6ga6hExHeCN6Br8tcKsd2ggiZTB4ycjyiy4Qkgueza3vMdfXi9tmE2fSHByowzyEp6QVaG",
+      "cu": 406487,
+      "randomnessHex": "f9b700625e993c3d8b2ee0f0d9dbe9dcd6a9c167e35a0998514d4518f7571adf",
+      "explorer": "https://explorer.solana.com/tx/43HqXoTsaWfmUkXNGh6ga6hExHeCN6Br8tcKsd2ggiZTB4ycjyiy4Qkgueza3vMdfXi9tmE2fSHByowzyEp6QVaG?cluster=devnet"
+    },
+    {
+      "round": 16341918,
+      "signature": "iRFjZkgWKpngMDW3H61dKrrsMwMd2ZJhXq4wguUyTnCfhypKffvRKYBfipTt8HS5pqQk2QJYsmp7xWRYWCzBBNd",
+      "cu": 409120,
+      "randomnessHex": "3ce9d21560b00bfdf6930ddd3cd424dd61828a155c30965b2d93dc57d21699a7",
+      "explorer": "https://explorer.solana.com/tx/iRFjZkgWKpngMDW3H61dKrrsMwMd2ZJhXq4wguUyTnCfhypKffvRKYBfipTt8HS5pqQk2QJYsmp7xWRYWCzBBNd?cluster=devnet"
+    }
+  ]
+}

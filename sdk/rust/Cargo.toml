@@ -22,6 +22,15 @@ cpi = ["alea-verifier/cpi"]
 anchor-lang = { workspace = true }
 alea-verifier = { path = "../../programs/alea-verifier", features = ["cpi"] }
 
+# dev-dependencies are only used by `tests/devnet_clock.rs` (`--ignored`
+# by default so normal `cargo test` does not touch devnet). Versions pinned
+# to 1.18.x to match the resolved solana-program in the workspace
+# (anchor-lang 0.30.1 → solana-program 1.18.26).
+[dev-dependencies]
+solana-client = "=1.18.26"
+solana-sdk = "=1.18.26"
+bincode = "=1.3.3"
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

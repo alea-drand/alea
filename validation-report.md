@@ -172,3 +172,79 @@ verification proven on Solana localnet. Ready for Phase 3 devnet deploy.
 Raw per-round CU data: `validation-report-phase2-cu.json` (50 rounds,
 not committed to avoid growing the repo — regenerate with
 `anchor test --skip-build`).
+
+## Phase 3 — Devnet Deployment + Live Testing (2026-04-18)
+
+**Deployed binary SHA256:** `8965062489fdcdbb538597545fc6692f3f580d770d34f2d42000a70560984b1c` (matches v0.2.0-audit-passed baseline byte-for-byte via `solana program dump`)
+
+**Deployment:**
+- Program ID: `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U`
+- Cluster: devnet (https://api.devnet.solana.com + Helius authenticated for reliability)
+- Deploy tx: `4tr4yetr4j3U9LjSNfA4CWVYNKrZr9nAKx51pV9baXJ7FAB1Hi4AjquAcQUcpgGD7buiGR9ppSbYTrVETnD9Zdtj`
+- ProgramData address: `6GvKJTbq5hggrPwfQuE7vt6tgHn8mn1P9bu63QZ7q9kZ`
+- Data Length: 800,000 bytes (`--max-len 800000` — 2.2× headroom for future upgrades)
+- Upgrade authority: `9cPWdtoR7sW7VVYxfrJZ9ekxX2fZctskXn3L4BSmafcc` (deployer; pre-Squads per ADR 0009 v1)
+
+**Upgrade fire drill (Phase D-bis):** same audit-passed binary redeployed immediately after initial deploy. Tx `5bbihbgp2CYJ8hq5nJWCRxk5xqxY47JkyXTd4qJiXb48CXbtdCncQhWUVYSi2tUx168JNjc9FJYD6x36BMQGTDut`. Post-upgrade SHA still `8965062489fd...`; authority preserved. Upgrade path proven — the "can always change the code" invariant holds.
+
+**Config PDA initialization:**
+- Address: `6anALRxD98Tw7zbA9d5i4NJfTvxDsNBHohHVJWxv2Xm8` (bump 253)
+- Init tx: `2ty5NNeHf8PCt7aHiL8adqyEA9VaA5PVFEerEYoc9JTBT6vZ1mCs638PRfwQudornfSht4v8kG2tH5LGXHjdJUPW`
+- Wave X+1 on-chain gate accepted deployer signer
+- Post-flight byte-equality verified all 6 stored fields (pubkey_g2 / chain_hash / genesis_time / period / authority / bump)
+
+**Live drand round verification (10 rounds, live mode racing beacon emission):**
+
+| Round | CU | Tx sig |
+|---|---|---|
+| 16341843 | 406,211 | `324ahSPNc89dk8xodyPwK66vLkpSWk58BS3qyfp5q94VY2MWooxTN4gpFu88JLqM8ZG82L6Jy6YT8KCUgMC2mgvx` |
+| 16341888 | 409,586 | `5ittXKXF6xyAsX7x3ddWrbfCoEgBKbUK6g79KfacHcfi65cxeC37ouNBKNZZqFvA3JosSXofDLhqDN7LB6qnGWj6` |
+| 16341889 | 406,057 | `2MRzSsnYLN8XNB2bNut5Qvq4AmuZotLrzb9abg2z41JTtYGX5mrFBos63aisUgR9jqvuFqgCAzCeRPLHD8bHKuT4` |
+| 16341912 | 404,039 | `otNX3H3XtHWJKCUda78pMj32sTWJYqZK6cEhKQgcLFFZdn4YmHmDqwQe1LN2ryAyeKAFVdffPu3wBhVWCuGX4dQ` |
+| 16341913 | 406,896 | `4aVHP3ZkHSTR3BhA2r4VLF7FFVF5pqJj4p7aC1GSaA8DEK8kxxhEMfUve8LEtYu9sNaZuLnzYc3Qng9PpFaT2vmz` |
+| 16341914 | 406,638 | `3H9vDaAiSM78RSv4mqohadZC8pPsQR8rxV2KJbxwE3XPirrozZEveLfJHqoKiNwYywVRqVuKheSKBnWuhgdhydx6` |
+| 16341915 | 406,273 | `7KTwYYLrSEBX8ofSYYBJM29UZxYLZf2Na3M3SH4ctM1CZ9pbemvp8opKYCheaKygFiMoxwqmdEjZAAz9sGGQCTq` |
+| 16341916 | 404,448 | `5Chq8o8EtzmJ8qhNxqUqM1hYS5JMvBoLRTBe2oSUAHG6tTVwEjFcyE7o38pjSYtaD8K3syxADhEpXVsvjzUtrkgh` |
+| 16341917 | 406,487 | `43HqXoTsaWfmUkXNGh6ga6hExHeCN6Br8tcKsd2ggiZTB4ycjyiy4Qkgueza3vMdfXi9tmE2fSHByowzyEp6QVaG` |
+| 16341918 | 409,120 | `iRFjZkgWKpngMDW3H61dKrrsMwMd2ZJhXq4wguUyTnCfhypKffvRKYBfipTt8HS5pqQk2QJYsmp7xWRYWCzBBNd` |
+
+All 10 rounds: `returnData == sha256(signature)` byte-for-byte (ADR 0036) AND matched drand's reported `randomness` field.
+
+**CU distribution (n=7, second batch after retry patch):**
+
+| Metric | Devnet | Localnet (Wave G baseline) |
+|---|---|---|
+| min | 404,039 | — |
+| p50 | 406,487 | — |
+| mean | 406,272 | — |
+| p95 | 409,120 | — |
+| max | **409,120** | **413,874** |
+| variance | **0.38%** | **0.53%** |
+
+Devnet is ~1% more efficient than localnet CU-wise — within the ±5% tolerance. Max 409,120 sits at 45% of the 900K SDK gate. Raw distribution: `validation-report-phase3-cu.json`.
+
+**Failure cases on devnet:**
+
+| Case | Expected code | Actual | Explorer |
+|---|---|---|---|
+| Round 0 | 6002 `RoundZero` | 6002 ✓ | tx sig in `validation-report-phase3-failures.json` |
+| Wrong-round pairing mismatch | 6000 `InvalidSignature` | 6000 ✓ | — |
+| Off-curve signature (x = Fq prime) | 6001 `InvalidG1Point` | 6001 ✓ | — |
+
+All three branches of the verify pipeline reject as specified on real network.
+
+**SDK unit tests:** 6/6 pass via `cargo test -p alea-sdk is_round_recent`.
+
+**Live-Clock test:** 3/3 recency assertions pass against real devnet Clock sysvar + Config PDA via `cargo test -p alea-sdk --test devnet_clock -- --ignored`. (Sample output: `computed current_round=16342022` at devnet slot 456,465,711 / unix 1,776,547,138.)
+
+**ADR 0031 chain-hash guard framing:** the initialize handler's `require!(chain_hash == EXPECTED_EVMNET_CHAIN_HASH)` guard (error 6007) and companion `EXPECTED_EVMNET_*` byte-equality guards (6008/6010/6011) are validated via (a) Wave G localnet regression tests, (b) production init's post-flight byte-equality of all 6 Config fields. Re-running initialize with a wrong chain_hash on devnet is not feasible (script aborts pre-flight if Config PDA exists; PDA is created on first init); the protocol-level guarantee is that only-correct-constants-can-be-stored, which is satisfied.
+
+**Phase 3 acceptance gate: CLEARED** except §3.8 Randamu outreach (deferred — Aaron drafts manually). Devnet program ID ready for Phase 4 SDK + consumer integration.
+
+**Invariants hold:**
+1. Program ID `ALEAydzHd...` live on devnet, owned by `BPFLoaderUpgradeab1e11111111111111111111111` ✓
+2. ProgramData authority = `9cPWdtoR...` (deployer) ✓
+3. Deployed binary SHA256 matches audit-passed `8965062489fd...` ✓
+4. Config PDA exists, 217 B, all 6 fields byte-match hardcoded constants ✓
+5. `config.authority` = deployer ✓
+6. Upgrade path proven via Phase D-bis fire drill ✓
