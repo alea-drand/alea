@@ -1,0 +1,20 @@
+[
+  {
+    "label": "round_zero",
+    "expectedCode": 6002,
+    "actualCode": 6002,
+    "passed": true
+  },
+  {
+    "label": "wrong_round_pairing_mismatch",
+    "expectedCode": 6000,
+    "actualCode": 6000,
+    "passed": true
+  },
+  {
+    "label": "off_curve_x_equals_fq",
+    "expectedCode": 6001,
+    "actualCode": 6001,
+    "passed": true
+  }
+]
