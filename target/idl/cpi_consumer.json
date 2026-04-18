@@ -1,0 +1,77 @@
+{
+  "address": "CjG5jdi4unFM2QJ1Z46kB58fHpGbtiEj2m8PmEyPSKvj",
+  "metadata": {
+    "name": "cpi_consumer",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Test-only fixture: CPI consumer that calls alea_verifier::verify"
+  },
+  "instructions": [
+    {
+      "name": "consume_randomness",
+      "discriminator": [
+        190,
+        217,
+        49,
+        162,
+        99,
+        26,
+        73,
+        234
+      ],
+      "accounts": [
+        {
+          "name": "alea_program",
+          "address": "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U"
+        },
+        {
+          "name": "alea_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "alea_program"
+            }
+          }
+        },
+        {
+          "name": "payer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "round",
+          "type": "u64"
+        },
+        {
+          "name": "signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "array": [
+          "u8",
+          32
+        ]
+      }
+    }
+  ]
+}

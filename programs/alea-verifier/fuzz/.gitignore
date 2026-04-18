@@ -1,0 +1,9 @@
+target
+corpus
+artifacts
+coverage
+run-logs
+campaign-metadata.json
+environment.txt
+fuzzing-campaign-proof-*.tar.gz
+fuzzing-campaign-proof-*.tar.gz.sha256

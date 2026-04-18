@@ -21,17 +21,15 @@ default = []
 
 [dependencies]
 anchor-lang = { workspace = true }
-# Phase 1.1.A adds these after BPF compilation validation (ADR 0023):
-# ark-ff = { workspace = true, default-features = false }
-# ark-bn254 = { workspace = true, default-features = false }
-# ark-ec = { workspace = true, default-features = false }
-# solana-program = { workspace = true }
-# solana-bn254 = "=2.2"
-# hex-literal = "=0.4.1"
-# once_cell = { version = "1", default-features = false }
+ark-ff = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ec = { workspace = true }
+ark-serialize = { workspace = true }
 
-[profile.release]
-overflow-checks = true
-lto = "fat"
-codegen-units = 1
-strip = true
+[dev-dependencies]
+hex-literal = "0.4"
+hex = "0.4"
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+

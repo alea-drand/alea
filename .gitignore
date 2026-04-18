@@ -1,5 +1,12 @@
-# Solana build artifacts
-target/
+# Solana build artifacts — ignore everything under target/ EXCEPT the
+# hand-written IDL, which must be committed (Anchor 0.30.1 proc-macro2
+# incompat prevents auto-gen; see ~/vault/80-learnings/2026-04-16-
+# anchor-030-proc-macro2-incompatibility.md).
+target/*
+!target/idl
+target/idl/*
+!target/idl/alea_verifier.json
+!target/idl/cpi_consumer.json
 .anchor/
 node_modules/
 test-ledger/
@@ -29,3 +36,17 @@ build-spec/
 
 # Monitoring (private)
 scripts/collect-metrics.ts
+
+# Raw CU benchmark data — regeneratable via anchor test. validation-report.md
+# summarizes the stats; per-round data doesn't need to bloat the repo.
+validation-report-phase2-cu.json
+
+# Audit byproducts (Phase 2.5 Stage 1 static analysis output)
+.xray/
+programs/alea-verifier/programs_alea-verifier.ll
+
+# Subcrate cargo build outputs (root target/ already handled above with
+# idl-exception; this catches per-subcrate target/ dirs that cargo-build-sbf
+# and cargo fuzz produce for individual crates).
+programs/*/target/
+programs/*/fuzz/target/
