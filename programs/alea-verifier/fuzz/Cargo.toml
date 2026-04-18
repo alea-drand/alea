@@ -1,0 +1,60 @@
+[package]
+name = "alea-verifier-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# Standalone workspace so cargo-fuzz doesn't conflict with the main Anchor workspace.
+[workspace]
+
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+ark-ff = { version = "=0.5.0", default-features = false }
+ark-bn254 = { version = "=0.5.0", default-features = false, features = ["curve"] }
+ark-ec = { version = "=0.5.0", default-features = false }
+hex = "0.4"
+
+[dependencies.alea-verifier]
+path = ".."
+
+[[bin]]
+name = "verify_beacon"
+path = "fuzz_targets/verify_beacon.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "hash_to_g1"
+path = "fuzz_targets/hash_to_g1.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "on_curve_g1"
+path = "fuzz_targets/on_curve_g1.rs"
+test = false
+doc = false
+bench = false
+
+# Phase 2.5 Wave G additions (Stage 8 target expansion).
+
+[[bin]]
+name = "hash_to_field_canonicity"
+path = "fuzz_targets/hash_to_field_canonicity.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pairing_buffer_parses"
+path = "fuzz_targets/pairing_buffer_parses.rs"
+test = false
+doc = false
+bench = false
