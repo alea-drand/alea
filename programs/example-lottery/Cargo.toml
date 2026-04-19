@@ -19,4 +19,6 @@ idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = { workspace = true }
-alea-sdk = { path = "../../sdk/rust", features = ["cpi"] }
+# alea-sdk: cpi feature removed in Phase 4.5 (T1-14) since it was a no-op;
+# alea-sdk now always pulls alea-verifier with its `cpi` feature.
+alea-sdk = { path = "../../sdk/rust" }

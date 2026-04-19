@@ -13,9 +13,13 @@ afterEach(() => {
 });
 
 function mockFetchResponse(status: number, body?: object): Response {
+  // Phase 4.5: mock must expose `headers.get()` for the new Content-Length
+  // size-cap check (T2-05). Return a Headers-shaped stub.
+  const headers = new Headers({});
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers,
     json: async () => body,
   } as unknown as Response;
 }

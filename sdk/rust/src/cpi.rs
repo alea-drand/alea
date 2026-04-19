@@ -44,6 +44,7 @@ use anchor_lang::prelude::*;
 /// # Errors
 /// Returns Alea's on-chain error codes (6000-6009) for signature,
 /// chain-hash, or field-arithmetic failures. See [`crate::AleaError`].
+#[must_use = "Alea's return data is single-slot — capture randomness immediately; any later CPI overwrites it"]
 pub fn verify<'info>(
     alea_program: AccountInfo<'info>,
     config: AccountInfo<'info>,
@@ -51,6 +52,13 @@ pub fn verify<'info>(
     round: u64,
     signature: [u8; 64],
 ) -> Result<[u8; 32]> {
+    // Defense-in-depth (Phase 4.5 T1-08): the mandatory `seeds::program`
+    // guard lives in the consumer's #[derive(Accounts)], which is the
+    // strong defense for Anchor-idiomatic callers. Non-Anchor callers
+    // (raw process_instruction handlers, governance relays, CPI
+    // forwarders) bypass that check. A runtime owner assertion here
+    // closes the gap at ~200 CU cost (0.04% of the 900K budget).
+    require_keys_eq!(*config.owner, crate::PROGRAM_ID, crate::AleaError::WrongPubkey);
     let accounts = alea_verifier::cpi::accounts::Verify {
         config: config.clone(),
         payer: payer.clone(),
