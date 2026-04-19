@@ -89,6 +89,10 @@
 //! for maturity disclosures before integrating.
 
 #![deny(unsafe_code)]
+// Suppress Anchor 0.30.1's harmless `anchor-debug` cfg warning (emitted by
+// the #[derive(Accounts)] macro). Same suppression that
+// programs/alea-verifier/src/lib.rs carries.
+#![allow(unexpected_cfgs)]
 
 pub mod accounts;
 pub mod cpi;

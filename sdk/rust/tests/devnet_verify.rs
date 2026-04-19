@@ -138,12 +138,8 @@ fn submit_and_get_meta(
         encoding: Some(solana_transaction_status::UiTransactionEncoding::Base64),
     };
 
-    for attempt in 0..15 {
-        std::thread::sleep(std::time::Duration::from_secs(if attempt == 0 {
-            2
-        } else {
-            2
-        }));
+    for _attempt in 0..15 {
+        std::thread::sleep(std::time::Duration::from_secs(2));
         if let Ok(confirmed) = rpc.get_transaction_with_config(&sig, confirmed_config) {
             let meta = confirmed
                 .transaction

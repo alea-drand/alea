@@ -1,34 +1,55 @@
 name: Test
+
+# Runs workspace-wide Rust unit tests on every push + PR. Does NOT run
+# `anchor test` because:
+#   1. `anchor build` hits the Anchor 0.30.1 + proc-macro2 1.0.82+ IDL-generation
+#      bug (framework-gotchas) — broken on current toolchains
+#   2. `anchor test` requires localnet + long-running validator; expensive in CI
+#   3. Full localnet integration tests live in `tests/alea.ts` and are run
+#      locally via `anchor test` + manual devnet pushes (see
+#      scripts/devnet-verify-loop.ts + sdk/rust/tests/devnet_verify.rs, both
+#      gated `#[ignore]` / env-var so they don't fire in default `cargo test`)
+#
+# This workflow catches:
+#   - Compilation regressions across the whole workspace
+#   - Unit test regressions in alea-verifier, alea-sdk, cpi-consumer,
+#     example-lottery (their lib-level tests)
+#   - is_round_recent boundary tests, PDA derivation determinism, etc.
+#
+# Does NOT catch:
+#   - On-chain integration regressions (run `cargo test -- --ignored` locally
+#     or trigger devnet workflow manually)
+#   - IDL drift (idl-diff.yml handles that separately)
+
 on: [push, pull_request]
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # T2.32 — coral-xyz/anchor-action does NOT exist (verified 2026-04-14
-      # via GitHub API: github.com/coral-xyz/anchor-action returns 404).
-      # Use manual solana-install + avm pattern instead.
-
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        # Reads rust-toolchain.toml once it's pinned post Phase 1.1.A.
-        # Hardcoded temporarily; swap to rust-toolchain.toml-reading once
-        # ADR 0023 / rust-toolchain.toml resolve.
+        uses: dtolnay/rust-toolchain@stable
+        # Workspace doesn't pin a specific rustc (rust-toolchain.toml absent).
+        # Anchor 0.30.1 + deps resolve cleanly on stable rustc.
         with:
-          toolchain: "1.79.0"  # TBD — Phase 1.1.A output
+          components: rustfmt, clippy
 
-      - name: Install Solana CLI
-        run: |
-          sh -c "$(curl -sSfL https://release.solana.com/v2.2.0/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Install Anchor via AVM (pinned =0.30.1)
-        run: |
-          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          avm install 0.30.1
-          avm use 0.30.1
-          anchor --version | grep "0.30.1" || exit 1
+      - name: Build workspace (cargo check, all crates)
+        run: cargo check --workspace --all-targets
 
-      - run: anchor build
-      - run: anchor test
+      - name: Run unit tests (non-ignored only)
+        # `--lib --tests` runs lib-unit + integration tests in tests/ dirs.
+        # Tests marked `#[ignore]` (devnet_verify, devnet_clock) are skipped.
+        run: cargo test --workspace --lib --tests
