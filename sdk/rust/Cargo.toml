@@ -30,8 +30,9 @@ alea-verifier = { path = "../../programs/alea-verifier", features = ["cpi"] }
 solana-client = "=1.18.26"
 solana-sdk = "=1.18.26"
 bincode = "=1.3.3"
+hex-literal = "0.4"
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["cpi"]
 rustdoc-args = ["--cfg", "docsrs"]
 targets = ["x86_64-unknown-linux-gnu"]
