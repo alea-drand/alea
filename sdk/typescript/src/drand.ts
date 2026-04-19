@@ -85,7 +85,12 @@ function hexToBytes(hex: string): Uint8Array {
 // - T2-06: `redirect: "error"` — no following redirects (MITM prevention;
 //   a compromised CDN cannot redirect to an attacker-controlled domain)
 // - T2-07: exhaustion throws 6100 (was code 0 which wasn't in ERRORS map)
-export async function fetchBeacon(round?: bigint): Promise<DrandBeacon> {
+// - T2-15: accept caller AbortSignal to cancel mid-retry-loop (e.g., user
+//   navigates away mid-page — drop the 77s worst-case hang cleanly)
+export async function fetchBeacon(
+  round?: bigint,
+  opts?: { signal?: AbortSignal },
+): Promise<DrandBeacon> {
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 1000;
   const TIMEOUT_MS = 5000;
@@ -93,13 +98,30 @@ export async function fetchBeacon(round?: bigint): Promise<DrandBeacon> {
 
   let targetRound: bigint = round ?? getCurrentRound();
   const chainHash = DRAND_CHAIN_HASH;
+  const userSignal = opts?.signal;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    // T2-15 abort checkpoint — fail fast if caller cancelled.
+    if (userSignal?.aborted) {
+      throw new AleaError(6103, "fetchBeacon aborted by caller");
+    }
     for (const endpoint of DRAND_ENDPOINTS) {
       try {
         const url = `${endpoint}/${chainHash}/public/${targetRound.toString()}`;
+        // Compose user abort with per-request timeout. AbortSignal.any
+        // requires Node 20+ / modern browsers; falls back to timeout-only
+        // if unavailable (older Node 18 early-patch). userSignal still
+        // checked at loop boundaries above.
+        const perReqTimeout = AbortSignal.timeout(TIMEOUT_MS);
+        const signal =
+          userSignal && typeof (AbortSignal as unknown as { any?: Function }).any === "function"
+            ? (AbortSignal as unknown as { any: (s: AbortSignal[]) => AbortSignal }).any([
+                perReqTimeout,
+                userSignal,
+              ])
+            : perReqTimeout;
         const response = await fetch(url, {
-          signal: AbortSignal.timeout(TIMEOUT_MS),
+          signal,
           redirect: "error",
         });
         if (response.ok) {
