@@ -29,6 +29,7 @@ alea-verifier = { path = "../../programs/alea-verifier", features = ["cpi"] }
 [dev-dependencies]
 solana-client = "=1.18.26"
 solana-sdk = "=1.18.26"
+solana-transaction-status = "=1.18.26"
 bincode = "=1.3.3"
 hex-literal = "0.4"
 
