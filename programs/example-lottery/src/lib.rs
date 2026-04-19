@@ -101,11 +101,7 @@ pub mod example_lottery {
     ///   3. alea_sdk::cpi::verify (on-chain BLS verification via CPI)
     ///   4. Capture randomness IMMEDIATELY (return-data ordering invariant)
     ///   5. Determine winner + pay out
-    pub fn resolve_bet(
-        ctx: Context<ResolveBet>,
-        round: u64,
-        signature: [u8; 64],
-    ) -> Result<()> {
+    pub fn resolve_bet(ctx: Context<ResolveBet>, round: u64, signature: [u8; 64]) -> Result<()> {
         let bet = &ctx.accounts.bet;
 
         // Guard 1: round must be at least the minimum committed round.
@@ -156,11 +152,7 @@ pub mod example_lottery {
                 .to_account_info()
                 .try_borrow_mut_lamports()? -= amount;
             **ctx.accounts.player.try_borrow_mut_lamports()? += amount;
-            msg!(
-                "resolve_bet: player {} won {} lamports",
-                player_key,
-                amount
-            );
+            msg!("resolve_bet: player {} won {} lamports", player_key, amount);
         } else {
             // Transfer locked SOL from Bet PDA to house (payer acts as house).
             **ctx

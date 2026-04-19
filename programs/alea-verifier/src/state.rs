@@ -44,7 +44,11 @@ mod tests {
 
     #[test]
     fn config_len_is_217_bytes() {
-        assert_eq!(Config::LEN, 217, "Config::LEN must equal spec.md §Account Schema (217 bytes)");
+        assert_eq!(
+            Config::LEN,
+            217,
+            "Config::LEN must equal spec.md §Account Schema (217 bytes)"
+        );
     }
 
     // P08-T3-03 (Phase 2.5 Wave I, Bucket A) — Borsh serialization round-trip.
@@ -75,13 +79,26 @@ mod tests {
         // Byte-layout sanity: Borsh writes fields in declaration order, so the
         // first 128 bytes MUST equal pubkey_g2, the next 8 bytes MUST be
         // genesis_time (little-endian u64), etc.
-        assert_eq!(&bytes[0..128], &[0xAB; 128], "pubkey_g2 must be first field");
-        assert_eq!(&bytes[128..136], &0x1122_3344_5566_7788u64.to_le_bytes(),
-            "genesis_time must follow pubkey_g2 as LE u64");
-        assert_eq!(&bytes[136..144], &3u64.to_le_bytes(),
-            "period must follow genesis_time as LE u64");
-        assert_eq!(&bytes[144..176], &[0xCD; 32],
-            "chain_hash must follow period");
+        assert_eq!(
+            &bytes[0..128],
+            &[0xAB; 128],
+            "pubkey_g2 must be first field"
+        );
+        assert_eq!(
+            &bytes[128..136],
+            &0x1122_3344_5566_7788u64.to_le_bytes(),
+            "genesis_time must follow pubkey_g2 as LE u64"
+        );
+        assert_eq!(
+            &bytes[136..144],
+            &3u64.to_le_bytes(),
+            "period must follow genesis_time as LE u64"
+        );
+        assert_eq!(
+            &bytes[144..176],
+            &[0xCD; 32],
+            "chain_hash must follow period"
+        );
         // authority (Pubkey) at 176..208; bump at 208.
         assert_eq!(bytes[208], 255, "bump must be the last byte");
 

@@ -151,12 +151,7 @@ pub fn config_pda(program_id: &Pubkey) -> (Pubkey, u8) {
 /// `round == u64::MAX` with realistic genesis/period values would
 /// otherwise overflow in `(round - 1) * period`. Saturation is preferred
 /// over wrapping because "stale" is the safe rejection outcome.
-pub fn is_round_recent(
-    round: u64,
-    config: &Config,
-    clock: &Clock,
-    max_age_seconds: u64,
-) -> bool {
+pub fn is_round_recent(round: u64, config: &Config, clock: &Clock, max_age_seconds: u64) -> bool {
     let round_timestamp = config
         .genesis_time
         .saturating_add(round.saturating_sub(1).saturating_mul(config.period));

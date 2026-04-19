@@ -32,11 +32,7 @@ pub mod alea_verifier {
         initialize_handler(ctx, pubkey_g2, genesis_time, period, chain_hash)
     }
 
-    pub fn verify(
-        ctx: Context<Verify>,
-        round: u64,
-        signature: [u8; 64],
-    ) -> Result<[u8; 32]> {
+    pub fn verify(ctx: Context<Verify>, round: u64, signature: [u8; 64]) -> Result<[u8; 32]> {
         verify_handler(ctx, round, signature)
     }
 
