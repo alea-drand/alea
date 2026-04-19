@@ -34,13 +34,15 @@ pub enum AleaError {
     #[msg("Round number must be greater than 0")]
     RoundZero, // 6002 — drand has no valid beacon for round 0
 
-    #[msg("Field element is not in the valid range")]
+    #[msg("Reserved (unreachable in v1) — do not treat as retryable")]
     InvalidFieldElement, // 6003 — T2.J: reserved per ADR 0028;
-    //  currently unreachable (hash_to_field uses
-    //  from_be_bytes_mod_order, so no range check
+    //  unreachable in v1 (hash_to_field uses
+    //  from_be_bytes_mod_order, no range check
     //  needed). Retained for future use if a
     //  future instruction adds a canonical-Fq
-    //  guard. Consumers may ignore.
+    //  guard. Consumers: if observed in prod,
+    //  treat as non-retryable PairingError-class;
+    //  do not loop.
     #[msg("Square root does not exist for this field element")]
     NoSquareRoot, // 6004 — T1.05: ACTIVATED. Emitted when
     //  hash_round_to_g1 returns None (all 3

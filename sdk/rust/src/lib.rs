@@ -159,7 +159,13 @@ pub fn is_round_recent(round: u64, config: &Config, clock: &Clock, max_age_secon
     let round_timestamp = config
         .genesis_time
         .saturating_add(round.saturating_sub(1).saturating_mul(config.period));
-    let current_timestamp = clock.unix_timestamp as u64;
+    // Phase 4.5 T2-01: clamp negative i64 unix_timestamp to 0 before the u64
+    // cast. Solana's live clock is always positive; this guard handles
+    // localnet clock quirks, misconfigured validators, and hypothetical
+    // future runtime bugs. Without the clamp, a negative i64 wraps to a huge
+    // u64, making all recency checks return stale (false) until clock
+    // normalizes — availability impact for any consumer that calls verify.
+    let current_timestamp = clock.unix_timestamp.max(0) as u64;
     current_timestamp.saturating_sub(round_timestamp) <= max_age_seconds
 }
 

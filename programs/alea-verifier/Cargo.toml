@@ -8,10 +8,15 @@ description = "On-chain drand BN254 BLS verifier for Solana"
 repository = "https://github.com/alea-drand/alea"
 homepage = "https://alea.so"
 keywords = ["solana", "drand", "randomness", "bls", "bn254"]
-categories = ["cryptography", "no-std"]
+categories = ["cryptography"]
+authors = ["Alea contributors <https://github.com/alea-drand/alea>"]
 
 [package.metadata.docs.rs]
-features = ["no-entrypoint"]
+# Build docs with the same features consumers get through alea-sdk's version
+# dep — `cpi` implies `no-entrypoint`, so this matches the library-mode view.
+features = ["cpi"]
+rustdoc-args = ["--cfg", "docsrs"]
+targets = ["x86_64-unknown-linux-gnu"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
