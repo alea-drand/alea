@@ -334,3 +334,88 @@ Test Files  1 passed (1)
 - Vanity program ID revisit for mainnet
 - Mail server for `security@alea.so` inbound
 - `@alea/palestra-sdk` (Phase 7) + Docusaurus docs site (Phase 6) + Randamu outreach (manual)
+
+---
+
+## Phase 4.5 — Pre-Publish Audit + Hardening (2026-04-19)
+
+**Goal:** World-class SDK first impression. Close every publish blocker before first `cargo publish` / `npm publish`.
+
+### Audit coverage (12 agents, cold-read, materials-only)
+
+| Audit | Agents | T1 | T2 | T3 |
+|---|---|---|---|---|
+| Persona cold-read | 8 (4 Rust + 4 TS incl. 2 Opus for security) | 14 | ~22 | ~18 |
+| Adversarial red team | 4 (API fuzzer, drand adversary, replay/griefing, crypto edge — 1 Opus) | 5 | ~6 | ~7 |
+| **Consolidated (deduped)** | 12 total | **16** | **~28** | **~25** |
+
+**Critical security posture:** Zero exploitable crypto findings. Zero replay/griefing T1. Crypto boundaries (G1/G2, SVDW, pairing, sha256 per ADR 0036) passed edge-case review. Consumer-layer `seeds::program` + `is_round_recent` + return-data-ordering guardrails held against every probe.
+
+### T1s resolved (all 16)
+
+- **TS SDK input hardening:** hexToBytes validation, round domain guard, null signer guard, signature length validation, fetchBeacon round-match enforcement, response size cap, redirect:error
+- **TS SDK bundler compat:** IDL inlined at build (src/idl.ts via scripts/generate-idl-ts.mjs); Node fs/path/url imports removed from client.ts; `@alea/sdk` now runs in Vite/webpack/Next.js App Router with zero polyfills
+- **TS SDK package hygiene:** peerDependencies key added (was orphan meta); removed src/idl/** dupe from tarball; web3.js + anchor moved to peerDeps; vitest 2.x upgrade; default export condition; sideEffects:false
+- **Rust SDK defense-in-depth:** `cpi::verify` runtime owner check on config account (~200 CU) — closes the non-Anchor-caller bypass
+- **Rust SDK manifest:** `cpi` feature removed (was no-op); `rust-version = "1.79"` MSRV declared; `authors` field added; `no-std` category removed (false claim)
+- **Workspace:** deleted commented `[patch.crates-io]` section (fragile-posture signal)
+- **Documentation coherence:** root README `AleaVerify → AleaVerifier` typo fix; sdk/rust/README quick-start made self-contained + `rust,ignore` annotated; error-code table regenerated from errors.rs (was fabricated variant names); TS README rewritten with Testing-on-Devnet, Zero-Telemetry, Community & Support, package-verification sections; MAINNET_PROGRAM_ID comment corrected; commitment-param doc cleanup
+- **example-lottery payout rewrite:** checked_sub + checked_add + InsufficientFunds/PayoutOverflow errors replace direct lamport manipulation underflow-risk pattern; winning path now leans on Anchor's `close = player` constraint cleanly
+
+### T2s resolved (all ~28)
+
+- Security hardening: i64→u64 clamp on clock timestamps (Rust + TS), BeaconVerified.payer privacy doc warning, cpi::verify #[must_use], MAINNET_PROGRAM_ID proxy tightened (throws on toString/has/ownKeys/getPrototypeOf)
+- Capability guards: wallet.signTransaction verified before call, isBrowserWallet null/undefined-safe
+- User-controllable cancellation: AbortSignal threaded through getVerifiedRandomness → verifyDrandBeacon + fetchBeacon; new 6103 error code; skipPreflight opt-out
+- Error-code completeness: ERRORS map synced with alea-verifier/errors.rs (adds 6010/6011/6012); new SDK-side codes 6100 (DrandFetchFailed), 6101 (DrandRoundMismatch), 6102 (InvalidInput), 6103 (Aborted)
+- example-lottery: correlated-randomness doc warning (Marcus T2), min_allowed_round formula exhaustively documented
+- Rust ecosystem: alea-verifier docs.rs metadata features=["cpi"]; rust-version MSRV; InvalidFieldElement 6003 msg rewrite to correctly signal "Reserved, do not retry"
+
+### Supply-chain automation (new `.github/workflows/supply-chain.yml`)
+
+- cargo-deny baseline: advisories ok, bans ok, licenses ok, sources ok
+- 5 documented advisory ignores (Solana 1.18.x transitives): RUSTSEC-2024-0344 curve25519-dalek, 2024-0388 derivative, 2024-0436 paste, 2025-0141 bincode, 2025-0161 libsecp256k1
+- `deny.toml` with license allowlist (Apache-2.0 + OSI permissive) and ban/source rules
+- npm audit --omit=dev --audit-level=moderate on @alea/sdk — 0 vulns
+- gitleaks secret scan on PR + weekly cron
+- Runs on every PR + push to main + weekly cron (catches newly-disclosed CVEs)
+
+### `release.yml` rewrite (T1-15)
+
+- Dropped broken `anchor test` → `cargo test --workspace --lib --tests`
+- Dropped broken `anchor build --verifiable` → consumers reproduce via solana-verify CLI against tag commit (no .so in GitHub release)
+- `npm publish --provenance` + `id-token: write` permission for Sigstore-signed attestation
+- alea-sdk → alea-verifier dep uses `path + version = "=0.1.0"` dual-decl (cargo strips `path` on publish automatically; no sed swap)
+- Least-privilege workflow permissions on all workflows
+
+### CHANGELOG v0.1.0 section written
+
+Full Keep-a-Changelog format with Added / Security / Known Limitations / Versioning Policy. Cites ADR 0028 freeze. Lists every public API item shipped.
+
+### Threat model document
+
+`audit/phase-4.5/THREAT-MODEL.md` — one-page trusted-vs-untrusted surface enumeration with mitigations, in-scope vectors, out-of-scope, review history table. For external auditor consumption.
+
+### Final verification (2026-04-19 post-fixes)
+
+| Gate | Result |
+|---|---|
+| `cargo test --workspace --lib --tests` | 74 passing (2 + 6 + 61 + 3 + 1 + 1 unit/integration) |
+| `cd sdk/typescript && npm test` | 37 passing (5 files) |
+| `cargo publish --dry-run -p alea-verifier --no-default-features --features no-entrypoint` | clean; 20 files, 181.7KiB (52.2KiB compressed) |
+| `cd sdk/typescript && npm publish --dry-run --access public` | clean; **36 files, 28.0 kB packed, 98.8 kB unpacked, shasum `595c6199b38df0b68951dc7f1b6326d9e762081d`** |
+| `cargo deny check` | advisories ok, bans ok, licenses ok, sources ok |
+| `npm audit --omit=dev --audit-level=moderate` | 0 vulnerabilities |
+| git clean on `feature/phase-4.5-audit` | ✓ |
+
+### Publish-ready status
+
+The three packages are publish-ready pending Aaron's manual steps:
+1. Create `@alea` npm organization at https://www.npmjs.com/org/create (free)
+2. Generate crates.io API token (scoped to "publish new crates" + "publish new versions")
+3. Generate npm automation token (type: Automation)
+4. Add both to GitHub repo secrets as `CARGO_REGISTRY_TOKEN` + `NPM_TOKEN`
+5. Optionally: set up GitHub Discussions tab + re-enable GitHub Actions
+
+Then tag `v0.1.0` and push — release.yml publishes in sequence.
+
