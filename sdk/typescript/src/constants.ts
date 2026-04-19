@@ -15,41 +15,22 @@ export const DRAND_ENDPOINTS: readonly string[] = [
   "https://api.drand.secureweb3.com:6875",
 ];
 
+// Alea's program ID is CLUSTER-AGNOSTIC: the same vanity ID deploys
+// identically to devnet, mainnet, localnet, or any Solana cluster you
+// choose to run on. Your Connection object determines which cluster's
+// deployment the tx actually lands against.
+//
+// As of v0.1.0: Alea is live on DEVNET only. Mainnet deploy is the
+// Phase 5 gate. If you point a mainnet Connection at the SDK today,
+// the tx will fail at the Solana RPC layer with "Program not found"
+// (or similar) — Solana itself is the safety rail, not the SDK.
+//
+// DEVNET_PROGRAM_ID and MAINNET_PROGRAM_ID are exposed as distinct
+// symbols for clarity-of-intent in consumer code (`programId: MAINNET_
+// PROGRAM_ID` reads as 'I intend mainnet'), but they point to the same
+// bytes. See ADR 0028 + sdk/typescript/CAVEATS.md §1 for cluster state.
 export const DEVNET_PROGRAM_ID = new PublicKey(
   "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U",
 );
 
-// Phase 4.5 T2-08: tighten the throw carve-outs. Previous impl silently
-// returned undefined for `toString` and `Symbol.toPrimitive` so that
-// `console.log(MAINNET_PROGRAM_ID)` wouldn't crash, but that let
-// `MAINNET_PROGRAM_ID.toString()` return "undefined" — consumers using
-// it in template strings or explorer-URL construction got invalid
-// strings silently. Now throws on those too. We keep the `then` carve-
-// out so that accidentally awaiting an import doesn't hang forever.
-//
-// ESM doesn't allow Object.defineProperty on live bindings, so we export
-// a Proxy that throws on every property access.
-const MAINNET_THROW_MESSAGE =
-  "MAINNET_PROGRAM_ID not set (v0.1.x is devnet-only). Pass { programId } " +
-  "explicitly, or wait for the post-Phase-5 release that bakes in the " +
-  "deployed mainnet ID. This symbol intentionally throws to prevent silent " +
-  "wrong-network deployments.";
-
-export const MAINNET_PROGRAM_ID: PublicKey = new Proxy({} as PublicKey, {
-  get(_target, prop) {
-    // `then` carve-out: if someone accidentally `await`s an import that
-    // destructures MAINNET_PROGRAM_ID, Promise resolution probes `.then`
-    // and would loop forever. Returning undefined breaks the probe cleanly.
-    if (prop === "then") return undefined;
-    throw new Error(MAINNET_THROW_MESSAGE);
-  },
-  has() {
-    throw new Error(MAINNET_THROW_MESSAGE);
-  },
-  ownKeys() {
-    throw new Error(MAINNET_THROW_MESSAGE);
-  },
-  getPrototypeOf() {
-    throw new Error(MAINNET_THROW_MESSAGE);
-  },
-});
+export const MAINNET_PROGRAM_ID = DEVNET_PROGRAM_ID;

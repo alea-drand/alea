@@ -102,11 +102,15 @@ describe("createVerifyInstruction", () => {
 });
 
 describe("MAINNET_PROGRAM_ID", () => {
-  it("throws when accessed (T2.O — not set until Phase 5)", async () => {
-    const { MAINNET_PROGRAM_ID } = await import("../src/constants.js");
-    expect(() => {
-      // Accessing any property triggers the throw
-      void (MAINNET_PROGRAM_ID as any).toBase58;
-    }).toThrow("MAINNET_PROGRAM_ID not set");
+  it("is an alias for DEVNET_PROGRAM_ID (cluster-agnostic design)", async () => {
+    const { MAINNET_PROGRAM_ID, DEVNET_PROGRAM_ID } = await import("../src/constants.js");
+    // Alea deploys to the same vanity ID on all clusters; the Connection
+    // object determines which cluster's deployment the tx targets. The
+    // two exports are distinct symbols for intent clarity in consumer
+    // code, but point to the same bytes.
+    expect(MAINNET_PROGRAM_ID.toBase58()).toBe(DEVNET_PROGRAM_ID.toBase58());
+    expect(MAINNET_PROGRAM_ID.toBase58()).toBe(
+      "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U",
+    );
   });
 });

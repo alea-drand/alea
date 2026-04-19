@@ -6,7 +6,9 @@ Six things to know before using this SDK in production.
 
 ## 1. Devnet Only (Phase 5 Resolution: Mainnet Deploy)
 
-The program at `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U` is deployed on **Solana devnet only**. `MAINNET_PROGRAM_ID` throws intentionally — there is no mainnet program yet. Phase 5 deploys to mainnet and publishes a new SDK release with the live ID.
+The program at `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U` is deployed on **Solana devnet only**. Mainnet deploy is the Phase 5 gate.
+
+Alea's program ID is cluster-agnostic — the SDK exports both `DEVNET_PROGRAM_ID` and `MAINNET_PROGRAM_ID` pointing to the same bytes (distinct symbols for intent clarity in consumer code). If you use a mainnet `Connection` before Phase 5, the tx fails at the Solana RPC layer with "program not found" — Solana itself is the safety rail. For production testing prior to Phase 5, use a devnet `Connection("https://api.devnet.solana.com")`.
 
 ## 2. Internal Audit Only (Phase 5 Resolution: External Paid Audit)
 

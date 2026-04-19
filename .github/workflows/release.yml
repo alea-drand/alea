@@ -122,13 +122,15 @@ jobs:
         # version for the tarball — no manual swap dance needed.
         run: cargo publish -p alea-sdk
 
-      - name: Publish @alea/sdk to npm (with provenance)
+      - name: Publish @alea-drand/sdk to npm (with provenance)
         working-directory: sdk/typescript
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         # --provenance produces a signed Sigstore attestation linking
         # the tarball to this exact commit + workflow run. Consumers
-        # can verify via `npm audit signatures`.
+        # can verify via `npm audit signatures`. Post-v0.1.0 migration
+        # path: configure Trusted Publishing on npm package settings,
+        # remove NPM_TOKEN, rely on OIDC via `id-token: write`.
         run: npm publish --access public --provenance
 
       - name: Create GitHub Release

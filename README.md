@@ -81,8 +81,10 @@ const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 const signer = Keypair.fromSecretKey(/* your keypair bytes */);
 
 // One-liner: fetches the latest drand beacon, submits verify tx, returns 32 bytes.
-// v0.1.x ships DEVNET as the default program ID; mainnet is a throw-proxy until
-// Phase 5 (see sdk/typescript/README.md "Devnet vs Mainnet" for the swap).
+// v0.1.x targets DEVNET. Alea's program ID is cluster-agnostic — DEVNET_PROGRAM_ID
+// and MAINNET_PROGRAM_ID are the same bytes; your Connection determines cluster.
+// Mainnet program deploys in Phase 5; a mainnet Connection before then fails at
+// the RPC layer with "program not found."
 const randomness: Uint8Array = await getVerifiedRandomness({
   connection,
   signer,
