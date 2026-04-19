@@ -3,7 +3,7 @@
 // programs/alea-verifier's Anchor IDL). Regenerate with:
 //   npm run generate-idl
 //
-// This file exists so @alea/sdk can be imported in any browser bundler
+// This file exists so @alea-drand/sdk can be imported in any browser bundler
 // without Node fs/path deps. Phase 4.5 T1-01 fix.
 
 import type { Idl } from "@coral-xyz/anchor";
