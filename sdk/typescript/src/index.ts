@@ -13,4 +13,4 @@ export {
 } from "./constants.js";
 export { AleaError, ERRORS } from "./errors.js";
 export type { DrandBeacon } from "./drand.js";
-export type { DrandConfig, SolanaClock, BeaconResult, VerifyOptions } from "./types.js";
+export type { DrandConfig, SolanaClock } from "./types.js";

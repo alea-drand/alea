@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { getConfigAddress } from "../src/instruction.js";
 import { DEVNET_PROGRAM_ID } from "../src/constants.js";
@@ -36,7 +36,8 @@ describe("createVerifyInstruction", () => {
   it("uses verify discriminator [133, 161, 141, 48, 120, 198, 88, 150]", async () => {
     const { createVerifyInstruction } = await import("../src/instruction.js");
     const sig = hexToBytes(ROUND_1_SIGNATURE_HEX);
-    const ix = createVerifyInstruction({ round: 1n, signature: sig });
+    const payer = Keypair.generate().publicKey;
+    const ix = createVerifyInstruction({ round: 1n, signature: sig, payer });
 
     const discriminatorBytes = Buffer.from(ix.data).slice(0, 8);
     expect(discriminatorBytes).toEqual(VERIFY_DISCRIMINATOR);
@@ -45,7 +46,8 @@ describe("createVerifyInstruction", () => {
   it("encodes round as u64 LE", async () => {
     const { createVerifyInstruction } = await import("../src/instruction.js");
     const sig = hexToBytes(ROUND_1_SIGNATURE_HEX);
-    const ix = createVerifyInstruction({ round: 1n, signature: sig });
+    const payer = Keypair.generate().publicKey;
+    const ix = createVerifyInstruction({ round: 1n, signature: sig, payer });
 
     const roundBuf = Buffer.from(ix.data).slice(8, 16);
     expect(roundBuf.readBigUInt64LE()).toBe(1n);
@@ -54,7 +56,8 @@ describe("createVerifyInstruction", () => {
   it("includes signature bytes after round", async () => {
     const { createVerifyInstruction } = await import("../src/instruction.js");
     const sig = hexToBytes(ROUND_1_SIGNATURE_HEX);
-    const ix = createVerifyInstruction({ round: 1n, signature: sig });
+    const payer = Keypair.generate().publicKey;
+    const ix = createVerifyInstruction({ round: 1n, signature: sig, payer });
 
     const sigBytes = Buffer.from(ix.data).slice(16, 80);
     expect(sigBytes).toEqual(Buffer.from(sig));
@@ -63,7 +66,8 @@ describe("createVerifyInstruction", () => {
   it("uses config PDA as first account (not writable, not signer)", async () => {
     const { createVerifyInstruction } = await import("../src/instruction.js");
     const sig = hexToBytes(ROUND_1_SIGNATURE_HEX);
-    const ix = createVerifyInstruction({ round: 1n, signature: sig });
+    const payer = Keypair.generate().publicKey;
+    const ix = createVerifyInstruction({ round: 1n, signature: sig, payer });
 
     const configPda = getConfigAddress(DEVNET_PROGRAM_ID);
     const firstKey = ix.keys[0];
@@ -76,9 +80,24 @@ describe("createVerifyInstruction", () => {
   it("uses correct program ID", async () => {
     const { createVerifyInstruction } = await import("../src/instruction.js");
     const sig = hexToBytes(ROUND_1_SIGNATURE_HEX);
-    const ix = createVerifyInstruction({ round: 1n, signature: sig });
+    const payer = Keypair.generate().publicKey;
+    const ix = createVerifyInstruction({ round: 1n, signature: sig, payer });
 
     expect(ix.programId.toBase58()).toBe(DEVNET_PROGRAM_ID.toBase58());
+  });
+
+  it("includes payer as second account (signer + writable) — phase 4.5 A3", async () => {
+    const { createVerifyInstruction } = await import("../src/instruction.js");
+    const sig = hexToBytes(ROUND_1_SIGNATURE_HEX);
+    const payer = Keypair.generate().publicKey;
+    const ix = createVerifyInstruction({ round: 1n, signature: sig, payer });
+
+    expect(ix.keys.length).toBe(2);
+    const payerKey = ix.keys[1];
+    expect(payerKey).toBeDefined();
+    expect(payerKey!.pubkey.toBase58()).toBe(payer.toBase58());
+    expect(payerKey!.isSigner).toBe(true);
+    expect(payerKey!.isWritable).toBe(true);
   });
 });
 

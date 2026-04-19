@@ -36,7 +36,7 @@ use anchor_lang::prelude::*;
 ///   [`crate::PROGRAM_ID`])
 /// * `config` — the Alea Config PDA (must be checked in the consumer's
 ///   Accounts struct with `seeds::program = alea_program.key()` — see
-///   [`crate::AleaVerify`])
+///   the `lib.rs` doc example and ADR 0034)
 /// * `payer` — signer, passed through to Alea's Verify accounts struct
 /// * `round` — drand round number
 /// * `signature` — 64-byte G1 point (uncompressed, x || y big-endian)
