@@ -62,7 +62,7 @@
     }
   },
   "dependencies": {
-    "@noble/hashes": "^1.5"
+    "@noble/hashes": "^2.2"
   },
   "devDependencies": {
     "typescript": "^5.4",
