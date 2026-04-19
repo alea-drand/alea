@@ -178,7 +178,7 @@ Every transaction calling Alea **MUST** include a compute budget instruction of 
 let cu_ix = ComputeBudgetInstruction::set_compute_unit_limit(900_000);
 ```
 
-The TypeScript SDK (`@alea/sdk`) injects this automatically. Rust consumers must add it manually.
+The TypeScript SDK (`@alea-drand/sdk`) injects this automatically. Rust consumers must add it manually.
 
 ---
 
@@ -279,7 +279,7 @@ Anchor 0.30.1's `anchor-syn` crate calls a proc-macro2 API removed in 1.0.82+. T
 
 ### Compute budget exceeded / "Program failed to complete"
 
-Every tx that CPIs into Alea MUST include `ComputeBudgetInstruction::set_compute_unit_limit(900_000)`. Solana's default is 200K; Alea needs up to 454K, plus consumer headroom. The [`@alea/sdk` TypeScript SDK](https://npmjs.com/package/@alea/sdk) injects this automatically; Rust consumers building raw txs must add it manually.
+Every tx that CPIs into Alea MUST include `ComputeBudgetInstruction::set_compute_unit_limit(900_000)`. Solana's default is 200K; Alea needs up to 454K, plus consumer headroom. The [`@alea-drand/sdk` TypeScript SDK](https://npmjs.com/package/@alea-drand/sdk) injects this automatically; Rust consumers building raw txs must add it manually.
 
 ### `AleaError::WrongPubkey` (6008) when the on-chain Config looks correct
 

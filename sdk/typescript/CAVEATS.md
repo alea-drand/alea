@@ -1,4 +1,4 @@
-# @alea/sdk — Maturity Disclosures
+# @alea-drand/sdk — Maturity Disclosures
 
 Six things to know before using this SDK in production.
 

@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 /// never remove (reserved even if unreachable, see NoSquareRoot).
 ///
 /// Canonical source: `build-spec/program/spec.md §"Error Codes"`.
-/// Consumer SDKs (TS `@alea/sdk` and Rust `alea-sdk`) map these 1:1.
+/// Consumer SDKs (TS `@alea-drand/sdk` and Rust `alea-sdk`) map these 1:1.
 ///
 /// # Anchor framework error codes to be aware of (not Alea-custom)
 ///
