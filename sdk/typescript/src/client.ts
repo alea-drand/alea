@@ -27,6 +27,45 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// Extract an on-chain Solana custom-program error code from any of the error
+// shapes thrown by web3.js / Anchor under skipPreflight=true. Mirrors the
+// errCode() helper in scripts/devnet-verify-loop.ts. Returns undefined if no
+// recognizable code is present.
+function extractErrorCode(err: unknown): number | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const e = err as Record<string, any>;
+
+  // Anchor-wrapped error
+  const anchorCode =
+    e["error"]?.errorCode?.number ??
+    e["errorCode"]?.number ??
+    (typeof e["code"] === "number" ? e["code"] : undefined);
+  if (typeof anchorCode === "number") return anchorCode;
+
+  // Raw Solana {InstructionError: [ixIdx, {Custom: N}]}
+  const ie = e["InstructionError"];
+  if (Array.isArray(ie) && ie.length === 2) {
+    const inner = ie[1];
+    if (inner && typeof inner.Custom === "number") return inner.Custom;
+  }
+
+  // web3.js SendTransactionError: logs are under either `logs` or `transactionLogs`
+  const logs: string[] | undefined =
+    (Array.isArray(e["logs"]) && e["logs"]) ||
+    (Array.isArray(e["transactionLogs"]) && e["transactionLogs"]) ||
+    undefined;
+  if (logs) {
+    for (const line of logs) {
+      const mA = String(line).match(/Error Number: (\d+)/);
+      if (mA && mA[1]) return parseInt(mA[1], 10);
+      const mB = String(line).match(/custom program error: 0x([0-9a-fA-F]+)/);
+      if (mB && mB[1]) return parseInt(mB[1], 16);
+    }
+  }
+
+  return undefined;
+}
+
 export async function verifyDrandBeacon(args: {
   connection: Connection;
   signer: Keypair | Wallet;
@@ -59,22 +98,56 @@ export async function verifyDrandBeacon(args: {
   const cuLimit = args.computeUnits ?? 900_000;
   const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: cuLimit });
 
-  // T1.09 — BN constructor accepts string for bigint safety
-  const tx = await (program.methods as any)
+  // Build the transaction via Anchor's IDL (discriminator + arg serialization)
+  // but SEND it ourselves via connection.sendRawTransaction. This bypasses
+  // Anchor 0.30.1's `.rpc()` error-wrapping path, which is broken against
+  // @solana/web3.js ≥ 1.98: Anchor calls `new SendTransactionError(msg, logs)`
+  // (old 2-arg positional signature) but web3.js 1.98 changed the constructor
+  // to object destructuring `{action, signature, transactionMessage, logs}`.
+  // The result is a thrown Error with message "Unknown action 'undefined'"
+  // and all properties undefined — losing all error-code information.
+  //
+  // By building the tx + signing + sending ourselves, we read the on-chain
+  // failure cleanly from `getTransaction().meta.err` (raw Solana
+  // `{InstructionError: [ixIdx, {Custom: N}]}` shape) and map to AleaError.
+  // T1.09: BN accepts string for bigint safety.
+  const anchorTx: anchor.web3.Transaction = await (program.methods as any)
     .verify(new anchor.BN(args.round.toString()), Array.from(args.signature))
     .accounts({ config: configPda, payer: wallet.publicKey })
     .preInstructions([cuIx])
-    // skipPreflight: true is REQUIRED for Alea verify — pairing outpaces the
-    // preflight blockhash window under high-CU load. See framework-gotchas
-    // and scripts/devnet-verify-loop.ts (all 4 verify call sites use true).
-    // Errors still surface via tx.meta.err below.
-    .rpc({ commitment: "confirmed", skipPreflight: true });
+    .transaction();
+
+  const { blockhash, lastValidBlockHeight } = await args.connection.getLatestBlockhash("confirmed");
+  anchorTx.recentBlockhash = blockhash;
+  anchorTx.feePayer = wallet.publicKey;
+  const signedTx = await wallet.signTransaction(anchorTx);
+
+  // skipPreflight: true is REQUIRED for Alea verify — pairing outpaces the
+  // preflight blockhash window under high-CU load. See framework-gotchas
+  // and scripts/devnet-verify-loop.ts (all verify call sites use true).
+  const tx: string = await args.connection.sendRawTransaction(
+    signedTx.serialize(),
+    { skipPreflight: true, maxRetries: 3 },
+  );
+
+  // Wait for confirmation. Don't use confirmTransaction's promise because on
+  // failure it throws with a similarly-broken shape; instead, poll
+  // getTransaction until it returns (confirmed commitment) and then inspect
+  // meta.err ourselves.
+  await args.connection.confirmTransaction(
+    { signature: tx, blockhash, lastValidBlockHeight },
+    "confirmed",
+  ).catch(() => {
+    // confirmTransaction rejects on on-chain failure — we'll read meta.err
+    // from the polled getTransaction below. Swallow here to unify the error
+    // path through the meta.err extraction logic.
+  });
 
   // Retry getTransaction — Helius indexer lags 2-5s post-send per
-  // 2026-04-18-helius-devnet-indexer-lag learning note.
+  // [[2026-04-18-helius-devnet-indexer-lag]].
   let info = null;
   for (let attempt = 0; attempt < 15; attempt++) {
-    info = await args.connection.getTransaction(tx as string, {
+    info = await args.connection.getTransaction(tx, {
       commitment: "confirmed",
       maxSupportedTransactionVersion: 0,
     });
@@ -89,8 +162,7 @@ export async function verifyDrandBeacon(args: {
     );
   }
   if (info.meta?.err) {
-    // skipPreflight bypasses Anchor wrapper — errors arrive as raw Solana
-    // {InstructionError: [ixIdx, {Custom: N}]}. Extract and map to AleaError.
+    // Raw Solana {InstructionError: [ixIdx, {Custom: N}]} — extract and map.
     const raw = info.meta.err as any;
     const ie = raw?.InstructionError;
     if (Array.isArray(ie) && ie.length === 2) {
@@ -100,6 +172,11 @@ export async function verifyDrandBeacon(args: {
         const msg = ERRORS[code] ?? `Unknown error code ${code}`;
         throw new AleaError(code, msg);
       }
+    }
+    // Fall back to log-scan for "Error Number: N" patterns.
+    const code = extractErrorCode({ logs: info.meta.logMessages });
+    if (typeof code === "number") {
+      throw new AleaError(code, ERRORS[code] ?? `Unknown error code ${code}`);
     }
     throw new Error(`Transaction failed on-chain: ${JSON.stringify(raw)}`);
   }
