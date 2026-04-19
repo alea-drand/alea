@@ -10,7 +10,7 @@ import {
 import { DEVNET_PROGRAM_ID } from "./constants.js";
 import { fetchBeacon, getCurrentRound } from "./drand.js";
 import { getConfigAddress } from "./instruction.js";
-import { AleaError } from "./errors.js";
+import { AleaError, ERRORS } from "./errors.js";
 
 // @ts-ignore
 import idlJson from "./idl/alea_verifier.json" assert { type: "json" };
@@ -89,9 +89,19 @@ export async function verifyDrandBeacon(args: {
     );
   }
   if (info.meta?.err) {
-    throw new Error(
-      `Transaction failed on-chain: ${JSON.stringify(info.meta.err)}`,
-    );
+    // skipPreflight bypasses Anchor wrapper — errors arrive as raw Solana
+    // {InstructionError: [ixIdx, {Custom: N}]}. Extract and map to AleaError.
+    const raw = info.meta.err as any;
+    const ie = raw?.InstructionError;
+    if (Array.isArray(ie) && ie.length === 2) {
+      const inner = ie[1] as any;
+      if (typeof inner?.Custom === "number") {
+        const code: number = inner.Custom;
+        const msg = ERRORS[code] ?? `Unknown error code ${code}`;
+        throw new AleaError(code, msg);
+      }
+    }
+    throw new Error(`Transaction failed on-chain: ${JSON.stringify(raw)}`);
   }
 
   // T2.03 — extract return data (32-byte randomness) from tx metadata
