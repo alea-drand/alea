@@ -5,7 +5,7 @@
 [![CI](https://github.com/alea-drand/alea/actions/workflows/test.yml/badge.svg)](https://github.com/alea-drand/alea/actions/workflows/test.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![crates.io](https://img.shields.io/crates/v/alea-sdk.svg)](https://crates.io/crates/alea-sdk)
-[![npm](https://img.shields.io/npm/v/@alea/sdk.svg)](https://www.npmjs.com/package/@alea/sdk)
+[![npm](https://img.shields.io/npm/v/@alea-drand/sdk.svg)](https://www.npmjs.com/package/@alea-drand/sdk)
 [![drand](https://img.shields.io/badge/powered%20by-drand-ff6b6b.svg)](https://drand.love)
 
 Alea is the **first production drand BN254 verifier on Solana**¹. Any Solana program can call `alea_sdk::cpi::verify(program, config, payer, round, signature)` and get 32 bytes of cryptographically verified randomness in a single transaction — no callbacks, no keepers, no off-chain coordinators, no tokens, no fees.
@@ -27,7 +27,7 @@ Alea is the **first production drand BN254 verifier on Solana**¹. Any Solana pr
 
 ```bash
 cargo add alea-sdk
-# or: npm install @alea/sdk
+# or: npm install @alea-drand/sdk
 ```
 
 ### Rust CPI (on-chain composition)
@@ -74,7 +74,7 @@ pub fn resolve_game(ctx: Context<ResolveGame>, round: u64, signature: [u8; 64]) 
 ### TypeScript / Node (off-chain fetch + submit)
 
 ```typescript
-import { getVerifiedRandomness } from "@alea/sdk";
+import { getVerifiedRandomness } from "@alea-drand/sdk";
 import { Connection, Keypair } from "@solana/web3.js";
 
 const connection = new Connection("https://api.devnet.solana.com", "confirmed");
@@ -106,7 +106,7 @@ No off-chain steps. No hinting. No trusted coordinator. Pure cryptographic verif
 ## Architecture
 
 ```
-drand Network (23 orgs) → @alea/sdk (fetches beacon) → Solana tx
+drand Network (23 orgs) → @alea-drand/sdk (fetches beacon) → Solana tx
                                                           ↓
                                                  alea-verifier (on-chain)
                                                    1. keccak256(round)
@@ -144,7 +144,7 @@ If you need guaranteed SLAs for a commercial integration, open an issue — we'l
 
 ## Packages
 
-v0.1.0 publishes `alea-sdk` to crates.io and `@alea/sdk` to npm after devnet is stable. The on-chain `alea-verifier` program ID is published in CHANGELOG.md once deployed (devnet first, then mainnet post-Phase-5 per the governance roadmap below).
+v0.1.0 publishes `alea-sdk` to crates.io and `@alea-drand/sdk` to npm after devnet is stable. The on-chain `alea-verifier` program ID is published in CHANGELOG.md once deployed (devnet first, then mainnet post-Phase-5 per the governance roadmap below).
 
 ## Contributing
 
