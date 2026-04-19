@@ -5,6 +5,11 @@ edition = "2021"
 license = "Apache-2.0"
 description = "On-chain drand BN254 BLS verifier for Solana"
 repository = "https://github.com/alea-drand/alea"
+keywords = ["solana", "drand", "randomness", "bls", "bn254"]
+categories = ["cryptography", "no-std"]
+
+[package.metadata.docs.rs]
+features = ["no-entrypoint"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
