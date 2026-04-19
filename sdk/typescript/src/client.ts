@@ -4,7 +4,6 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  Commitment,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
 import { readFileSync } from "fs";
@@ -213,7 +212,6 @@ export async function getVerifiedRandomness(options: {
   connection: Connection;
   signer: Keypair | Wallet;
   programId?: PublicKey;
-  commitment?: Commitment;
   round?: bigint;
   computeUnits?: number;
 }): Promise<Uint8Array> {

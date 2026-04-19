@@ -1,5 +1,5 @@
 export class AleaError extends Error {
-  code: number;
+  readonly code: number;
   constructor(code: number, message: string) {
     super(message);
     this.name = "AleaError";
@@ -7,7 +7,10 @@ export class AleaError extends Error {
   }
 }
 
-export const ERRORS: Record<number, string> = {
+// Frozen at module load so a misbehaving consumer dep can't mutate error
+// messages in our address space. Type-level Readonly prevents compile-time
+// mutation; Object.freeze() prevents runtime mutation.
+export const ERRORS: Readonly<Record<number, string>> = Object.freeze({
   2001: "ConstraintHasOne: Signer is not the config authority (Anchor auto-generated)",
   6000: "InvalidSignature: BLS signature verification failed",
   6001: "InvalidG1Point: Signature bytes are not a valid G1 point",
@@ -19,4 +22,4 @@ export const ERRORS: Record<number, string> = {
   6007: "WrongChainHash: chain_hash does not match EXPECTED_EVMNET_CHAIN_HASH",
   6008: "WrongPubkey: pubkey_g2 does not match EXPECTED_EVMNET_G2_PUBKEY",
   6009: "ReturnDataMissing: CPI consumer received no return data",
-};
+});

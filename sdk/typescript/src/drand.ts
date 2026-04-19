@@ -28,6 +28,11 @@ export function getRoundAt(timestamp: bigint): bigint {
 }
 
 // T1.19 — symmetric with Rust CPI is_round_recent. Pure function, no I/O.
+// Behavior: future rounds (roundTs > clock.unixTimestamp) return TRUE, matching
+// Rust's saturating_sub semantics (current - round = 0 when future → 0 <= max).
+// Rationale: a consumer verifying right at the edge of round emission shouldn't
+// spuriously fail due to sub-second clock skew; the on-chain Rust check will
+// accept the same round a moment later anyway. Aligned 2026-04-19 (phase 4.5).
 export function isRoundRecent(
   round: bigint,
   config: { genesisTime: bigint; period: bigint },
@@ -36,8 +41,9 @@ export function isRoundRecent(
 ): boolean {
   if (round === 0n) return false;
   const roundTs = config.genesisTime + (round - 1n) * config.period;
-  const age = clock.unixTimestamp - roundTs;
-  return age >= 0n && age <= maxAgeSeconds;
+  const age =
+    clock.unixTimestamp > roundTs ? clock.unixTimestamp - roundTs : 0n;
+  return age <= maxAgeSeconds;
 }
 
 function hexToBytes(hex: string): Uint8Array {

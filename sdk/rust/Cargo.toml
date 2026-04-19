@@ -22,9 +22,9 @@ cpi = ["alea-verifier/cpi"]
 [dependencies]
 anchor-lang = { workspace = true }
 # `path` is used for local/workspace builds; cargo strips it on `cargo publish`
-# and falls back to `version = "=0.1.0"` for the tarball. This means every
-# alea-verifier version bump MUST be paired with an alea-sdk bump (even for
-# docs-only changes) so the exact-pin version dep resolves on crates.io.
+# and falls back to `version = "=0.1.0"` for the tarball. Every alea-verifier
+# version bump MUST be paired with an alea-sdk bump (even docs-only) so the
+# exact-pin version dep resolves on crates.io.
 alea-verifier = { path = "../../programs/alea-verifier", version = "=0.1.0", features = ["cpi"] }
 
 # dev-dependencies are only used by `tests/devnet_clock.rs` (`--ignored`

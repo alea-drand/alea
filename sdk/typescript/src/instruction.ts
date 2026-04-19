@@ -10,12 +10,17 @@ export function getConfigAddress(programId?: PublicKey): PublicKey {
   return pda;
 }
 
-// Lower-level instruction builder. Callers must add the payer signer account
-// to the returned instruction's keys before submitting. Use verifyDrandBeacon
-// for full auto-wiring via Anchor IDL (T2.04).
+// Lower-level instruction builder. Returns a fully-keyed instruction including
+// the payer as a signer key — the returned ix is ready to sign and submit.
+// Use verifyDrandBeacon for full auto-wiring (tx construction + send + error
+// extraction). Use this when you need raw control over transaction assembly
+// (e.g., composing into a multi-instruction tx with your own compute-budget
+// preflight or packing into a versioned transaction).
 export function createVerifyInstruction(options: {
   round: bigint;
   signature: Uint8Array;
+  /** Pays tx fee + must sign. Included in instruction keys as signer. */
+  payer: PublicKey;
   programId?: PublicKey;
 }): TransactionInstruction {
   const programId = options.programId ?? DEVNET_PROGRAM_ID;
@@ -31,9 +36,12 @@ export function createVerifyInstruction(options: {
 
   const data = Buffer.concat([discriminator, roundBuf, sigBuf]);
 
+  // Keys order matches Anchor's generated Verify accounts struct in
+  // programs/alea-verifier: config first, payer second.
   return new TransactionInstruction({
     keys: [
       { pubkey: configPda, isSigner: false, isWritable: false },
+      { pubkey: options.payer, isSigner: true, isWritable: true },
     ],
     programId,
     data,

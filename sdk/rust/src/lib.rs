@@ -98,7 +98,7 @@ pub mod accounts;
 pub mod cpi;
 pub mod errors;
 
-pub use accounts::{AleaVerify, Config};
+pub use accounts::Config;
 pub use alea_verifier::errors::AleaError;
 pub use alea_verifier::program::AleaVerifier;
 
