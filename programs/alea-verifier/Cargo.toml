@@ -2,9 +2,11 @@
 name = "alea-verifier"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.79"
 license = "Apache-2.0"
 description = "On-chain drand BN254 BLS verifier for Solana"
 repository = "https://github.com/alea-drand/alea"
+homepage = "https://alea.so"
 keywords = ["solana", "drand", "randomness", "bls", "bn254"]
 categories = ["cryptography", "no-std"]
 
