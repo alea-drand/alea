@@ -33,13 +33,13 @@
 //!         alea_sdk::is_round_recent(round, &ctx.accounts.alea_config, &ctx.accounts.clock, MAX_BEACON_AGE_SECONDS),
 //!         YourError::StaleBeacon,
 //!     );
-//!     // One-line CPI
+//!     // One-line CPI. Returns VerifiedRandomness (must_use wrapper).
 //!     let randomness = alea_sdk::cpi::verify(
 //!         ctx.accounts.alea_program.to_account_info(),
 //!         ctx.accounts.alea_config.to_account_info(),
 //!         ctx.accounts.payer.to_account_info(),
 //!         round, sig,
-//!     )?;
+//!     )?.into_inner();
 //!     // Read IMMEDIATELY — Solana return data is overwritten by any subsequent CPI
 //!     let random_value = u64::from_le_bytes(randomness[0..8].try_into().unwrap());
 //!     // … use randomness …
@@ -98,9 +98,10 @@ pub mod accounts;
 pub mod cpi;
 pub mod errors;
 
-pub use accounts::{AleaVerify, Config};
+pub use accounts::Config;
 pub use alea_verifier::errors::AleaError;
 pub use alea_verifier::program::AleaVerifier;
+pub use cpi::VerifiedRandomness;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::clock::Clock;
@@ -159,7 +160,13 @@ pub fn is_round_recent(round: u64, config: &Config, clock: &Clock, max_age_secon
     let round_timestamp = config
         .genesis_time
         .saturating_add(round.saturating_sub(1).saturating_mul(config.period));
-    let current_timestamp = clock.unix_timestamp as u64;
+    // Phase 4.5 T2-01: clamp negative i64 unix_timestamp to 0 before the u64
+    // cast. Solana's live clock is always positive; this guard handles
+    // localnet clock quirks, misconfigured validators, and hypothetical
+    // future runtime bugs. Without the clamp, a negative i64 wraps to a huge
+    // u64, making all recency checks return stale (false) until clock
+    // normalizes — availability impact for any consumer that calls verify.
+    let current_timestamp = clock.unix_timestamp.max(0) as u64;
     current_timestamp.saturating_sub(round_timestamp) <= max_age_seconds
 }
 
