@@ -94,8 +94,10 @@ dependencies = [
  "alea-verifier",
  "anchor-lang",
  "bincode",
+ "hex-literal",
  "solana-client",
  "solana-sdk",
+ "solana-transaction-status",
 ]
 
 [[package]]

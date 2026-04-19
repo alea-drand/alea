@@ -64,7 +64,11 @@ export async function verifyDrandBeacon(args: {
     .verify(new anchor.BN(args.round.toString()), Array.from(args.signature))
     .accounts({ config: configPda, payer: wallet.publicKey })
     .preInstructions([cuIx])
-    .rpc({ commitment: "confirmed", skipPreflight: false });
+    // skipPreflight: true is REQUIRED for Alea verify — pairing outpaces the
+    // preflight blockhash window under high-CU load. See framework-gotchas
+    // and scripts/devnet-verify-loop.ts (all 4 verify call sites use true).
+    // Errors still surface via tx.meta.err below.
+    .rpc({ commitment: "confirmed", skipPreflight: true });
 
   // Retry getTransaction — Helius indexer lags 2-5s post-send per
   // 2026-04-18-helius-devnet-indexer-lag learning note.
