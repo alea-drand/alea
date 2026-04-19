@@ -9,4 +9,13 @@ pub enum GameError {
     /// The drand beacon is too old — possible replay attack.
     #[msg("The drand beacon is too old (stale beacon)")]
     StaleBeacon,
+
+    /// Bet amount must be greater than zero.
+    #[msg("Bet amount must be greater than zero")]
+    ZeroAmount,
+
+    /// min_resolution_round is in the past — it must be a future drand round
+    /// that the player cannot have observed at commit time.
+    #[msg("min_resolution_round must be a future drand round (anti-front-run)")]
+    MinRoundInPast,
 }
