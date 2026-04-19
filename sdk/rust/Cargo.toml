@@ -2,6 +2,7 @@
 name = "alea-sdk"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.79"
 license = "Apache-2.0"
 description = "CPI crate for Alea — drand BN254 BLS randomness verifier on Solana"
 repository = "https://github.com/alea-drand/alea"
@@ -9,18 +10,23 @@ homepage = "https://alea.so"
 documentation = "https://docs.rs/alea-sdk"
 readme = "README.md"
 keywords = ["solana", "drand", "randomness", "bls", "bn254"]
-categories = ["cryptography", "no-std"]
+categories = ["cryptography"]
+authors = ["Alea contributors <https://github.com/alea-drand/alea>"]
 
 [lib]
 name = "alea_sdk"
 
-[features]
-default = []
-cpi = ["alea-verifier/cpi"]
+# Phase 4.5 T1-14: cpi feature removed. The alea-verifier dep below is always
+# pulled with its `cpi` feature (which implies `no-entrypoint`); making this
+# crate's `cpi` feature conditional was a no-op historically.
 
 [dependencies]
 anchor-lang = { workspace = true }
-alea-verifier = { path = "../../programs/alea-verifier", features = ["cpi"] }
+# `path` is used for local/workspace builds; cargo strips it on `cargo publish`
+# and falls back to `version = "=0.1.0"` for the tarball. Every alea-verifier
+# version bump MUST be paired with an alea-sdk bump (even docs-only) so the
+# exact-pin version dep resolves on crates.io.
+alea-verifier = { path = "../../programs/alea-verifier", version = "=0.1.0", features = ["cpi"] }
 
 # dev-dependencies are only used by `tests/devnet_clock.rs` (`--ignored`
 # by default so normal `cargo test` does not touch devnet). Versions pinned
@@ -29,9 +35,14 @@ alea-verifier = { path = "../../programs/alea-verifier", features = ["cpi"] }
 [dev-dependencies]
 solana-client = "=1.18.26"
 solana-sdk = "=1.18.26"
+solana-transaction-status = "=1.18.26"
 bincode = "=1.3.3"
+hex-literal = "0.4"
 
 [package.metadata.docs.rs]
+# Phase 4.5: cpi feature removed (T1-14); all-features default since crate
+# has no optional-surface. Targets x86_64-linux for deterministic docs.rs
+# build (Solana dev normally uses linux).
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 targets = ["x86_64-unknown-linux-gnu"]

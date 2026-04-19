@@ -33,7 +33,7 @@ cargo add alea-sdk
 ### Rust CPI (on-chain composition)
 
 ```rust
-use alea_sdk::{self, AleaVerify};
+use alea_sdk::{self, AleaVerifier};
 
 #[derive(Accounts)]
 pub struct ResolveGame<'info> {
@@ -80,12 +80,13 @@ import { Connection, Keypair } from "@solana/web3.js";
 const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 const signer = Keypair.fromSecretKey(/* your keypair bytes */);
 
-// One-liner: fetches the latest drand beacon, submits verify tx, returns 32 bytes
+// One-liner: fetches the latest drand beacon, submits verify tx, returns 32 bytes.
+// v0.1.x ships DEVNET as the default program ID; mainnet is a throw-proxy until
+// Phase 5 (see sdk/typescript/README.md "Devnet vs Mainnet" for the swap).
 const randomness: Uint8Array = await getVerifiedRandomness({
   connection,
   signer,
-  // programId defaults to mainnet; override for devnet with programId
-  // round defaults to latest; pass a bigint to pin a specific round
+  // round defaults to latest drand round — pass a bigint to pin a specific one
 });
 
 console.log("Verified randomness (hex):", Buffer.from(randomness).toString("hex"));

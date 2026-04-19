@@ -1,11 +1,11 @@
 use ark_bn254::Fq;
 use ark_ff::{BigInteger256, Field, PrimeField};
 
-use super::constants::{G2_GENERATOR, P_BIGINT};
-#[cfg(target_os = "solana")]
-use super::constants::GT_ONE;
 #[cfg(test)]
 use super::constants::EXPECTED_EVMNET_PUBKEY;
+#[cfg(target_os = "solana")]
+use super::constants::GT_ONE;
+use super::constants::{G2_GENERATOR, P_BIGINT};
 use super::hash_to_g1::hash_round_to_g1;
 use super::svdw::{fq_from_be_bytes, fq_to_be_bytes};
 
@@ -160,8 +160,8 @@ pub fn verify_pairing(
     match alt_bn128_pairing(&input) {
         Ok(result) if result.len() != 32 => None, // infra surprise → 6006
         Ok(result) if result[..] == GT_ONE[..] => Some(true),
-        Ok(_) => Some(false),                      // pairing result != GT_ONE
-        Err(_) => None,                            // syscall error → 6006
+        Ok(_) => Some(false), // pairing result != GT_ONE
+        Err(_) => None,       // syscall error → 6006
     }
 }
 
@@ -185,10 +185,7 @@ fn pairing_check_native(
     let pubkey_pt = decode_g2(pubkey);
 
     // e(σ, G2_gen) * e(-M, pubkey) == 1
-    let result = Bn254::multi_pairing(
-        [sig_pt, m_neg_pt],
-        [g2_gen_pt, pubkey_pt],
-    );
+    let result = Bn254::multi_pairing([sig_pt, m_neg_pt], [g2_gen_pt, pubkey_pt]);
     result.is_zero()
 }
 
@@ -255,8 +252,11 @@ mod bytes_to_bigint_tests {
         let mut bytes = [0u8; 32];
         bytes[31] = 0x01;
         let bi = bytes_to_bigint(&bytes);
-        assert_eq!(bi, BigInteger256::new([1, 0, 0, 0]),
-            "BE bytes [..., 0x01] must produce limbs [1, 0, 0, 0]");
+        assert_eq!(
+            bi,
+            BigInteger256::new([1, 0, 0, 0]),
+            "BE bytes [..., 0x01] must produce limbs [1, 0, 0, 0]"
+        );
     }
 
     #[test]
@@ -265,8 +265,11 @@ mod bytes_to_bigint_tests {
         let mut bytes = [0u8; 32];
         bytes[23] = 0x01;
         let bi = bytes_to_bigint(&bytes);
-        assert_eq!(bi, BigInteger256::new([0, 1, 0, 0]),
-            "BE byte 23 = 0x01 represents 2^64 — must land in limb[1]");
+        assert_eq!(
+            bi,
+            BigInteger256::new([0, 1, 0, 0]),
+            "BE byte 23 = 0x01 represents 2^64 — must land in limb[1]"
+        );
     }
 
     #[test]
@@ -277,10 +280,13 @@ mod bytes_to_bigint_tests {
         bytes[31] = 0xAA; // limb 0 low byte
         bytes[23] = 0xBB; // limb 1 low byte
         bytes[15] = 0xCC; // limb 2 low byte
-        bytes[7]  = 0xDD; // limb 3 low byte
+        bytes[7] = 0xDD; // limb 3 low byte
         let bi = bytes_to_bigint(&bytes);
-        assert_eq!(bi, BigInteger256::new([0xAA, 0xBB, 0xCC, 0xDD]),
-            "cross-limb BE decoding preserves per-limb LSB at byte offsets 31/23/15/7");
+        assert_eq!(
+            bi,
+            BigInteger256::new([0xAA, 0xBB, 0xCC, 0xDD]),
+            "cross-limb BE decoding preserves per-limb LSB at byte offsets 31/23/15/7"
+        );
     }
 }
 
@@ -303,7 +309,10 @@ mod tests {
         let p_be = hex!("30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47");
         let mut bytes = [0u8; 64];
         bytes[0..32].copy_from_slice(&p_be);
-        assert!(!on_curve_g1(&bytes), "x = p must be rejected (canonical form)");
+        assert!(
+            !on_curve_g1(&bytes),
+            "x = p must be rejected (canonical form)"
+        );
     }
 
     #[test]
@@ -311,7 +320,10 @@ mod tests {
         let p_be = hex!("30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47");
         let mut bytes = [0u8; 64];
         bytes[32..64].copy_from_slice(&p_be);
-        assert!(!on_curve_g1(&bytes), "y = p must be rejected (canonical form)");
+        assert!(
+            !on_curve_g1(&bytes),
+            "y = p must be rejected (canonical form)"
+        );
     }
 
     #[test]
@@ -319,7 +331,10 @@ mod tests {
         let mut bytes = [0u8; 64];
         bytes[31] = 1; // x = 1
         bytes[63] = 1; // y = 1, y² = 1 != x³+3 = 4
-        assert!(!on_curve_g1(&bytes), "(x=1, y=1) must be rejected (off curve)");
+        assert!(
+            !on_curve_g1(&bytes),
+            "(x=1, y=1) must be rejected (off curve)"
+        );
     }
 
     #[test]
@@ -383,7 +398,7 @@ mod tests {
             "2a23aca348c84badcf8df5321ac24577b7963d5b0d780bc4626baedb45cde373"
         );
         sig[0] ^= 0xFF; // corrupt the signature
-        // Corrupted sig may be off-curve, or pairing may fail
+                        // Corrupted sig may be off-curve, or pairing may fail
         let result = verify_beacon(1, &sig, &EXPECTED_EVMNET_PUBKEY);
         assert!(result.is_none(), "Invalid signature must fail verification");
     }

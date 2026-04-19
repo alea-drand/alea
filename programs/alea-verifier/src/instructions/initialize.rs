@@ -88,12 +88,18 @@ pub fn initialize_handler(
         AleaError::UnauthorizedInit,
     );
 
-    require!(chain_hash == EXPECTED_EVMNET_CHAIN_HASH, AleaError::WrongChainHash);
+    require!(
+        chain_hash == EXPECTED_EVMNET_CHAIN_HASH,
+        AleaError::WrongChainHash
+    );
     require!(pubkey_g2 == EXPECTED_EVMNET_PUBKEY, AleaError::WrongPubkey);
     // T2.E — byte-equality guards for all four Config fields. Prevents
     // genesis=0 / period=0 / wrong-constant attacks even if authority is
     // ever compromised. ADR 0031 extended.
-    require!(genesis_time == EXPECTED_EVMNET_GENESIS_TIME, AleaError::InvalidGenesisTime);
+    require!(
+        genesis_time == EXPECTED_EVMNET_GENESIS_TIME,
+        AleaError::InvalidGenesisTime
+    );
     require!(period == EXPECTED_EVMNET_PERIOD, AleaError::InvalidPeriod);
 
     let config = &mut ctx.accounts.config;

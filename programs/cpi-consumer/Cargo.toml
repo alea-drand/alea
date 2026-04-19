@@ -3,6 +3,7 @@ name = "cpi-consumer"
 version = "0.1.0"
 description = "Test-only fixture: CPI consumer that calls alea_verifier::cpi::verify"
 edition = "2021"
+license = "Apache-2.0"
 publish = false
 
 [lib]

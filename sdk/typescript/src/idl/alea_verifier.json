@@ -1,0 +1,473 @@
+{
+  "address": "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U",
+  "metadata": {
+    "name": "alea_verifier",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "First on-chain drand BN254 BLS verifier for Solana"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program_data",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  138, 166, 28, 129, 68, 133, 59, 101, 39, 200, 248, 154, 133, 95, 3, 0, 89, 112, 175, 136, 180, 53, 94, 82, 150, 253, 10, 49, 230, 191, 42, 121
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                2, 168, 246, 145, 78, 136, 161, 176, 226, 16, 21, 62, 247, 99, 174, 43, 0, 194, 185, 61, 22, 193, 36, 210, 192, 83, 122, 16, 4, 128, 0, 0
+              ]
+            }
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "pubkey_g2",
+          "type": {
+            "array": [
+              "u8",
+              128
+            ]
+          }
+        },
+        {
+          "name": "genesis_time",
+          "type": "u64"
+        },
+        {
+          "name": "period",
+          "type": "u64"
+        },
+        {
+          "name": "chain_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "verify",
+      "discriminator": [
+        133,
+        161,
+        141,
+        48,
+        120,
+        198,
+        88,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "round",
+          "type": "u64"
+        },
+        {
+          "name": "signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "array": [
+          "u8",
+          32
+        ]
+      }
+    },
+    {
+      "name": "update_config",
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "pubkey_g2",
+          "type": {
+            "array": [
+              "u8",
+              128
+            ]
+          }
+        },
+        {
+          "name": "genesis_time",
+          "type": "u64"
+        },
+        {
+          "name": "period",
+          "type": "u64"
+        },
+        {
+          "name": "chain_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "map_to_point_debug",
+      "discriminator": [
+        255,
+        36,
+        214,
+        128,
+        112,
+        18,
+        221,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "u_bytes",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "array": [
+          "u8",
+          64
+        ]
+      }
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BeaconVerified",
+      "discriminator": [
+        236,
+        101,
+        50,
+        109,
+        96,
+        146,
+        173,
+        242
+      ]
+    },
+    {
+      "name": "ConfigUpdated",
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidSignature",
+      "msg": "BLS signature verification failed"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidG1Point",
+      "msg": "Signature bytes are not a valid G1 point (y² != x³ + 3 mod p)"
+    },
+    {
+      "code": 6002,
+      "name": "RoundZero",
+      "msg": "Round number must be greater than 0"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidFieldElement",
+      "msg": "Field element is not in the valid range"
+    },
+    {
+      "code": 6004,
+      "name": "NoSquareRoot",
+      "msg": "Square root does not exist for this field element"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidG2Point",
+      "msg": "Public key bytes are not a valid G2 point"
+    },
+    {
+      "code": 6006,
+      "name": "PairingError",
+      "msg": "Pairing check syscall failed"
+    },
+    {
+      "code": 6007,
+      "name": "WrongChainHash",
+      "msg": "chain_hash does not match EXPECTED_EVMNET_CHAIN_HASH (wrong-chain deployment)"
+    },
+    {
+      "code": 6008,
+      "name": "WrongPubkey",
+      "msg": "pubkey_g2 does not match EXPECTED_EVMNET_G2_PUBKEY (ADR 0027 fallback path)"
+    },
+    {
+      "code": 6009,
+      "name": "ReturnDataMissing",
+      "msg": "CPI consumer: get_return_data returned None (program upgrade mismatch?)"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidGenesisTime",
+      "msg": "genesis_time does not match EXPECTED_EVMNET_GENESIS_TIME"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidPeriod",
+      "msg": "period does not match EXPECTED_EVMNET_PERIOD"
+    },
+    {
+      "code": 6012,
+      "name": "UnauthorizedInit",
+      "msg": "initialize authority must equal the program's upgrade_authority_address"
+    }
+  ],
+  "types": [
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey_g2",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          },
+          {
+            "name": "genesis_time",
+            "type": "u64"
+          },
+          {
+            "name": "period",
+            "type": "u64"
+          },
+          {
+            "name": "chain_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BeaconVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "u64"
+          },
+          {
+            "name": "randomness",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "payer",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "chain_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pubkey_g2_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
