@@ -1,0 +1,86 @@
+name: Supply Chain
+
+# Phase 4.5 T2 — supply-chain hardening. Runs three independent checks on
+# every PR + weekly cron: cargo-audit (known Rust advisories), cargo-deny
+# (license allowlist + yanked-crate guard + ban rules from deny.toml),
+# and npm audit (known runtime vulns in TS SDK deps). Weekly cron catches
+# newly disclosed CVEs in already-resolved deps.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Sunday 03:00 UTC — well after US work hours, avoids clashing with
+    # release windows.
+    - cron: '0 3 * * 0'
+
+# Least-privilege default. Specific jobs can grant more if needed.
+permissions:
+  contents: read
+
+jobs:
+  # cargo-audit omitted: its scope overlaps entirely with cargo-deny's
+  # advisories check, and cargo-deny supports `exclude-dev = true` which
+  # properly scopes findings to the published runtime surface. cargo-audit
+  # would fire ~6 errors for transitives inside Solana 1.18.x dev-deps
+  # that never ship to consumers — noise, not signal.
+
+  cargo-deny:
+    name: cargo deny (licenses + bans + sources)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.79.0"
+
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny
+
+      - name: cargo deny check
+        run: cargo deny --all-features check
+
+  npm-audit:
+    name: npm audit (@alea/sdk runtime deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install SDK deps
+        working-directory: sdk/typescript
+        run: npm ci
+
+      - name: npm audit (runtime only, moderate+ fails)
+        working-directory: sdk/typescript
+        # --omit=dev: ignore vulns in vitest/tsc (dev-only, not shipped).
+        # --audit-level=moderate: fail only on moderate/high/critical.
+        run: npm audit --omit=dev --audit-level=moderate
+
+  secret-scan:
+    name: trufflehog (secret scan)
+    runs-on: ubuntu-latest
+    # Swapped from gitleaks/gitleaks-action@v2 — that action requires a paid
+    # license for GitHub organization repos (we're under alea-drand). trufflehog
+    # is fully free + open-source under AGPL-3.0 and catches the same class
+    # of committed secrets.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run trufflehog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha || 'main' }}
+          head: HEAD
+          extra_args: --results=verified,unknown

@@ -36,11 +36,7 @@ pub struct Verify<'info> {
 /// Returns the 32-byte randomness on success; mapped to
 /// `Anchor::Result<[u8; 32]>` error codes per `program/spec.md §"Error
 /// Codes"` and §"Error Handling Details" (T3.09 tri-state for pairing).
-fn verify_beacon_full(
-    round: u64,
-    signature: &[u8; 64],
-    pubkey_g2: &[u8; 128],
-) -> Result<[u8; 32]> {
+fn verify_beacon_full(round: u64, signature: &[u8; 64], pubkey_g2: &[u8; 128]) -> Result<[u8; 32]> {
     // SECURITY: guard ordering is load-bearing. DO NOT REORDER.
     // 1. round > 0 (cheapest; protects against drand genesis sentinel)
     // 2. on_curve_g1 (canonical-form check BEFORE curve equation — CVE-
@@ -53,8 +49,8 @@ fn verify_beacon_full(
     // via ADR 0028 PDA-singleton + init-time guards; +200 CU per verify
     // not justified by current attack surface. Reference: cross-model-
     // delta.md + R3 decision #13.
-    require!(round > 0, AleaError::RoundZero);                                 // 6002
-    require!(on_curve_g1(signature), AleaError::InvalidG1Point);               // 6001
+    require!(round > 0, AleaError::RoundZero); // 6002
+    require!(on_curve_g1(signature), AleaError::InvalidG1Point); // 6001
 
     // msg_hash = keccak256(round.to_be_bytes()) happens inside hash_round_to_g1
     // (T1.02/T1.03: drand signs H2C(keccak256(8-byte BE round)))
@@ -66,7 +62,10 @@ fn verify_beacon_full(
     // T2.I — defense-in-depth: SVDW + hash_to_field + g1_add must produce
     // on-curve output. debug_assert compiles out in release (zero CU cost)
     // but catches any refactor-introduced regression in tests.
-    debug_assert!(on_curve_g1(&m), "SVDW invariant violated: hash_round_to_g1 returned off-curve point");
+    debug_assert!(
+        on_curve_g1(&m),
+        "SVDW invariant violated: hash_round_to_g1 returned off-curve point"
+    );
 
     let neg_m = negate_g1(&m);
 
@@ -78,8 +77,8 @@ fn verify_beacon_full(
             let randomness = anchor_lang::solana_program::hash::hash(signature).to_bytes();
             Ok(randomness)
         }
-        Some(false) => Err(AleaError::InvalidSignature.into()),                // 6000
-        None => Err(AleaError::PairingError.into()),                           // 6006 (BPF syscall Err only)
+        Some(false) => Err(AleaError::InvalidSignature.into()), // 6000
+        None => Err(AleaError::PairingError.into()),            // 6006 (BPF syscall Err only)
     }
 }
 
@@ -88,11 +87,7 @@ fn verify_beacon_full(
 /// `Ok([u8; 32])` return type instructs Anchor 0.30.x to auto-serialize
 /// the randomness into program return data (ADR 0030 — Pattern A, empirical
 /// confirmation deferred to Phase 2 Wave 10 test #12).
-pub fn verify_handler(
-    ctx: Context<Verify>,
-    round: u64,
-    signature: [u8; 64],
-) -> Result<[u8; 32]> {
+pub fn verify_handler(ctx: Context<Verify>, round: u64, signature: [u8; 64]) -> Result<[u8; 32]> {
     let randomness = verify_beacon_full(round, &signature, &ctx.accounts.config.pubkey_g2)?;
 
     emit!(BeaconVerified {
@@ -156,7 +151,11 @@ mod tests {
     fn verify_round_zero_returns_6002() {
         let err = verify_beacon_full(0, &ROUND_1_SIG, &EXPECTED_EVMNET_PUBKEY)
             .expect_err("round 0 must fail");
-        assert_eq!(err_code(err), 6002, "round 0 must return AleaError::RoundZero");
+        assert_eq!(
+            err_code(err),
+            6002,
+            "round 0 must return AleaError::RoundZero"
+        );
     }
 
     #[test]
@@ -169,7 +168,11 @@ mod tests {
         // gate before looking at y
         let err = verify_beacon_full(1, &sig, &EXPECTED_EVMNET_PUBKEY)
             .expect_err("non-canonical x must fail");
-        assert_eq!(err_code(err), 6001, "x=p must return AleaError::InvalidG1Point");
+        assert_eq!(
+            err_code(err),
+            6001,
+            "x=p must return AleaError::InvalidG1Point"
+        );
     }
 
     #[test]
@@ -180,7 +183,11 @@ mod tests {
         sig[63] = 1; // y = 1
         let err = verify_beacon_full(1, &sig, &EXPECTED_EVMNET_PUBKEY)
             .expect_err("off-curve sig must fail");
-        assert_eq!(err_code(err), 6001, "off-curve sig must return AleaError::InvalidG1Point");
+        assert_eq!(
+            err_code(err),
+            6001,
+            "off-curve sig must return AleaError::InvalidG1Point"
+        );
     }
 
     // T1.09 — split the old `verify_corrupt_signature_bit_flip_rejected`
@@ -229,7 +236,11 @@ mod tests {
         // round 1 signature presented under round 2 — on curve but pairing fails
         let err = verify_beacon_full(2, &ROUND_1_SIG, &EXPECTED_EVMNET_PUBKEY)
             .expect_err("wrong round must fail pairing");
-        assert_eq!(err_code(err), 6000, "wrong round must return AleaError::InvalidSignature");
+        assert_eq!(
+            err_code(err),
+            6000,
+            "wrong round must return AleaError::InvalidSignature"
+        );
     }
 
     // T2.S — u64::MAX round boundary. Codex E HIGH (1). Submits the

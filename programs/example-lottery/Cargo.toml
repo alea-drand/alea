@@ -1,0 +1,25 @@
+[package]
+name = "example-lottery"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "Canonical example consumer — demonstrates Alea CPI with all mandatory + SHOULD security constraints"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "example_lottery"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true }
+# alea-sdk: cpi feature removed in Phase 4.5 (T1-14) since it was a no-op;
+# alea-sdk now always pulls alea-verifier with its `cpi` feature.
+alea-sdk = { path = "../../sdk/rust" }

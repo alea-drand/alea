@@ -94,8 +94,10 @@ dependencies = [
  "alea-verifier",
  "anchor-lang",
  "bincode",
+ "hex-literal",
  "solana-client",
  "solana-sdk",
+ "solana-transaction-status",
 ]
 
 [[package]]
@@ -1707,6 +1709,14 @@ name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
+
+[[package]]
+name = "example-lottery"
+version = "0.1.0"
+dependencies = [
+ "alea-sdk",
+ "anchor-lang",
+]
 
 [[package]]
 name = "fastrand"

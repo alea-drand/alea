@@ -5,6 +5,9 @@
 //! can CPI to Alea and receive the 32-byte randomness via Anchor return
 //! data (ADR 0030 — Pattern A empirical validation).
 
+// Suppress Anchor 0.30.1's harmless `anchor-debug` cfg warning (same as
+// programs/alea-verifier/src/lib.rs).
+#![allow(unexpected_cfgs)]
 use anchor_lang::prelude::*;
 
 use alea_verifier::{

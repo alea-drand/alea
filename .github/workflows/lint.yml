@@ -1,8 +1,15 @@
 name: Lint
 on: [push, pull_request]
+
+# Phase 4.5 T2 — least-privilege. Lint is read-only.
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
