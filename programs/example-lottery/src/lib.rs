@@ -10,6 +10,9 @@
 //! This is a test-only / demonstration program. `publish = false` in Cargo.toml.
 //! Use `anchor build --no-idl -p example-lottery` for local testing.
 
+// Suppress Anchor 0.30.1's harmless `anchor-debug` cfg warning (same as
+// programs/alea-verifier/src/lib.rs).
+#![allow(unexpected_cfgs)]
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 
