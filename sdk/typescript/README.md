@@ -2,7 +2,7 @@
 
 Verified drand randomness on Solana in one call.
 
-> **v0.1.x ships DEVNET as the default program ID. Mainnet is a throw-proxy until Phase 5.** Read [CAVEATS.md](CAVEATS.md) before using in production. An external paid audit is scheduled for Phase 5 (pre-mainnet).
+> **v0.1.x is DEVNET only — mainnet program deploys in Phase 5.** Alea's program ID is cluster-agnostic; `DEVNET_PROGRAM_ID` and `MAINNET_PROGRAM_ID` point to the same bytes. Using a mainnet `Connection` before Phase 5 fails at the Solana RPC layer ("program not found"). Read [CAVEATS.md](CAVEATS.md) before production use. External paid audit scheduled for Phase 5.
 
 ## Install
 
@@ -167,7 +167,7 @@ DRAND_GENESIS_TIME  // 1727521075 (Unix seconds)
 DRAND_PERIOD        // 3 (seconds per drand round)
 DRAND_ENDPOINTS     // 5 fallback URLs (can be replaced for custom trust)
 DEVNET_PROGRAM_ID   // ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U
-MAINNET_PROGRAM_ID  // throws on access — not set until Phase 5 mainnet deploy
+MAINNET_PROGRAM_ID  // === DEVNET_PROGRAM_ID; cluster comes from your Connection
 ```
 
 ### `AleaError`
@@ -214,7 +214,7 @@ This SDK is for off-chain consumers. If you're building an on-chain program that
 | Network | Program ID |
 |---------|-----------|
 | Devnet  | `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U` |
-| Mainnet | Pending Phase 5 — `MAINNET_PROGRAM_ID` throws on access until then. Pass your own `{ programId }` or wait for the post-Phase-5 release |
+| Mainnet | Same vanity ID; program not yet deployed on mainnet (Phase 5 gate). Mainnet `Connection` will fail at the RPC layer with "program not found" until deploy. |
 
 ## Zero Telemetry
 
