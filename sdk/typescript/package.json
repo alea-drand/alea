@@ -53,7 +53,7 @@
   },
   "peerDependencies": {
     "@solana/web3.js": "^1.95.0",
-    "@coral-xyz/anchor": "^0.30.1",
+    "@coral-xyz/anchor": "^0.32.1",
     "@solana/wallet-adapter-base": "^0.9.0"
   },
   "peerDependenciesMeta": {
@@ -69,6 +69,6 @@
     "vitest": "^2.1",
     "@types/node": "^20",
     "@solana/web3.js": "^1.95.0",
-    "@coral-xyz/anchor": "^0.30.1"
+    "@coral-xyz/anchor": "^0.32.1"
   }
 }
