@@ -1,0 +1,22 @@
+[package]
+name = "example-lottery"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Canonical example consumer — demonstrates Alea CPI with all mandatory + SHOULD security constraints"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "example_lottery"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true }
+alea-sdk = { path = "../../sdk/rust", features = ["cpi"] }
