@@ -37,9 +37,33 @@ pub mod example_lottery {
         amount: u64,
         min_resolution_round: u64,
     ) -> Result<()> {
+        // Guard: reject zero-amount bets (otherwise the Bet PDA's locked
+        // lamports equal its rent exemption and the resolve_bet lamport
+        // math produces a no-op payout).
+        require!(amount > 0, GameError::ZeroAmount);
+
+        // Guard: min_resolution_round must be a FUTURE drand round relative
+        // to the current slot. Without this floor, a player could pass
+        // min_resolution_round = 0 and self-resolve using a round they
+        // already observed, defeating commit-reveal's anti-front-run property.
+        let alea_config = &ctx.accounts.alea_config;
+        let clock = &ctx.accounts.clock;
+        let current_ts = clock.unix_timestamp as u64;
+        // +period ensures the round must be emitted at least one period AFTER
+        // commit — the player cannot have observed it at commit time.
+        let min_allowed_ts = current_ts.saturating_add(alea_config.period);
+        let min_allowed_round = min_allowed_ts
+            .saturating_sub(alea_config.genesis_time)
+            .saturating_div(alea_config.period)
+            .saturating_add(1);
+        require!(
+            min_resolution_round >= min_allowed_round,
+            GameError::MinRoundInPast
+        );
+
         // Write all fields before taking any borrows for CPI.
         let player_key = ctx.accounts.player.key();
-        let slot = ctx.accounts.clock.slot;
+        let slot = clock.slot;
         let bump = ctx.bumps.bet;
         {
             let bet = &mut ctx.accounts.bet;
@@ -165,7 +189,7 @@ pub mod example_lottery {
 pub struct CommitBet<'info> {
     /// The Bet PDA — initialized here, holds the locked SOL + bet metadata.
     /// Seeds: [b"bet", player.key(), slot.to_le_bytes()] — slot disambiguates
-    /// multiple bets from the same player in the same epoch.
+    /// multiple bets from the same player in the same slot.
     #[account(
         init,
         payer = player,
@@ -177,6 +201,19 @@ pub struct CommitBet<'info> {
 
     #[account(mut)]
     pub player: Signer<'info>,
+
+    /// Alea program — needed only so the alea_config seeds::program constraint
+    /// works for the commit-time future-round check. Not invoked via CPI here.
+    pub alea_program: Program<'info, alea_sdk::AleaVerifier>,
+
+    /// Alea Config PDA (read-only). Used to compute the current drand round at
+    /// commit time so we can enforce min_resolution_round >= current_round + 1.
+    #[account(
+        seeds = [b"config"],
+        bump = alea_config.bump,
+        seeds::program = alea_program.key(),
+    )]
+    pub alea_config: Account<'info, alea_sdk::Config>,
 
     pub clock: Sysvar<'info, Clock>,
     pub system_program: Program<'info, System>,
@@ -193,12 +230,18 @@ pub struct ResolveBet<'info> {
     )]
     pub bet: Account<'info, Bet>,
 
-    /// The original player — receives SOL back if they win, or just rent on close.
-    /// CHECK: validated via `address = bet.player` constraint.
+    /// The original player. Required as Signer — only the player can resolve
+    /// their own bet. This prevents a griefer from force-resolving at a
+    /// preferred drand round to bias the outcome. (The spec's Palestra example
+    /// uses a permissionless-resolve pattern because Palestra has higher-level
+    /// game state that prevents round-selection attacks; a bare lottery does
+    /// not, so we require player signature here.)
     #[account(mut, address = bet.player)]
-    pub player: UncheckedAccount<'info>,
+    pub player: Signer<'info>,
 
-    /// Transaction payer — acts as "house" if player loses.
+    /// Transaction payer — acts as "house" if player loses. Typically the
+    /// same as player for self-play, or a dedicated house wallet for custodial
+    /// lotteries.
     #[account(mut)]
     pub payer: Signer<'info>,
 

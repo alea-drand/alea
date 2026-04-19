@@ -19,9 +19,7 @@
 //   3. Early-resolve fail: commit with future min_round → resolve too early → GameError::RoundTooEarly
 
 import * as anchor from "@coral-xyz/anchor";
-import { BN } from "@coral-xyz/anchor";
 import {
-  Keypair,
   PublicKey,
   SystemProgram,
   ComputeBudgetProgram,
@@ -190,6 +188,8 @@ describe("example-lottery", () => {
       keys: [
         { pubkey: betPdaAddr, isSigner: false, isWritable: true },
         { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+        { pubkey: ALEA_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: configPda, isSigner: false, isWritable: false },
         { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
@@ -268,6 +268,8 @@ describe("example-lottery", () => {
       keys: [
         { pubkey: betPdaAddr, isSigner: false, isWritable: true },
         { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+        { pubkey: ALEA_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: configPda, isSigner: false, isWritable: false },
         { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
@@ -282,7 +284,7 @@ describe("example-lottery", () => {
     const resolveIx = {
       keys: [
         { pubkey: betPdaAddr, isSigner: false, isWritable: true },
-        { pubkey: payer.publicKey, isSigner: false, isWritable: true },
+        { pubkey: payer.publicKey, isSigner: true, isWritable: true },
         { pubkey: payer.publicKey, isSigner: true, isWritable: true },
         { pubkey: ALEA_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: configPda, isSigner: false, isWritable: false },
@@ -317,6 +319,8 @@ describe("example-lottery", () => {
       keys: [
         { pubkey: betPdaAddr, isSigner: false, isWritable: true },
         { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+        { pubkey: ALEA_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: configPda, isSigner: false, isWritable: false },
         { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
@@ -336,7 +340,7 @@ describe("example-lottery", () => {
     const resolveIx = {
       keys: [
         { pubkey: betPdaAddr, isSigner: false, isWritable: true },
-        { pubkey: payer.publicKey, isSigner: false, isWritable: true },
+        { pubkey: payer.publicKey, isSigner: true, isWritable: true },
         { pubkey: payer.publicKey, isSigner: true, isWritable: true },
         { pubkey: ALEA_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: configPda, isSigner: false, isWritable: false },
