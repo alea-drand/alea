@@ -1,9 +1,9 @@
 use ark_bn254::Fq;
 use ark_ff::{AdditiveGroup, BigInteger, Field, PrimeField, Zero};
 
-use super::constants::{C1, C2, C3, C4, Z};
 #[cfg(not(target_os = "solana"))]
 use super::constants::B;
+use super::constants::{C1, C2, C3, C4, Z};
 
 /// Convert Fq to 32-byte big-endian representation
 pub fn fq_to_be_bytes(fq: &Fq) -> [u8; 32] {
@@ -23,7 +23,11 @@ pub fn fq_from_be_bytes(bytes: &[u8; 32]) -> Fq {
 /// CRITICAL: must use .into_bigint() to escape Montgomery form (T2.22)
 pub fn sgn0(x: &Fq) -> u8 {
     let bigint = x.into_bigint();
-    if bigint.is_odd() { 1 } else { 0 }
+    if bigint.is_odd() {
+        1
+    } else {
+        0
+    }
 }
 
 /// RFC 9380 §4: inv0 — modular inverse with inv0(0) = 0 convention
@@ -45,16 +49,24 @@ pub fn inv0(x: &Fq) -> Fq {
 // See ~/vault/80-learnings/2026-04-16-bpf-stack-frame-management.md.
 
 #[inline(never)]
-fn fq_mul(a: &Fq, b: &Fq) -> Fq { *a * *b }
+fn fq_mul(a: &Fq, b: &Fq) -> Fq {
+    *a * *b
+}
 
 #[inline(never)]
-fn fq_sq(a: &Fq) -> Fq { a.square() }
+fn fq_sq(a: &Fq) -> Fq {
+    a.square()
+}
 
 #[inline(never)]
-fn fq_add(a: &Fq, b: &Fq) -> Fq { *a + *b }
+fn fq_add(a: &Fq, b: &Fq) -> Fq {
+    *a + *b
+}
 
 #[inline(never)]
-fn fq_sub(a: &Fq, b: &Fq) -> Fq { *a - *b }
+fn fq_sub(a: &Fq, b: &Fq) -> Fq {
+    *a - *b
+}
 
 // ============================================================================
 // SVDW sqrt oracle — cfg-gated per ADR 0037
@@ -217,15 +229,14 @@ pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> anchor_lang::prelude::Result<[u8;
 
 #[cfg(target_os = "solana")]
 pub fn g1_add(p1: &[u8; 64], p2: &[u8; 64]) -> anchor_lang::prelude::Result<[u8; 64]> {
-    use anchor_lang::solana_program::alt_bn128::prelude::alt_bn128_addition;
     use crate::errors::AleaError;
+    use anchor_lang::solana_program::alt_bn128::prelude::alt_bn128_addition;
 
     let mut input = [0u8; 128];
     input[0..64].copy_from_slice(p1);
     input[64..128].copy_from_slice(p2);
 
-    let result = alt_bn128_addition(&input)
-        .map_err(|_| AleaError::PairingError)?;
+    let result = alt_bn128_addition(&input).map_err(|_| AleaError::PairingError)?;
     let mut out = [0u8; 64];
     out.copy_from_slice(&result[..64]);
     Ok(out)
@@ -249,8 +260,11 @@ mod tests {
 
     #[test]
     fn inv0_of_zero_is_zero() {
-        assert_eq!(inv0(&Fq::ZERO), Fq::ZERO,
-            "inv0(0) MUST return 0 per RFC 9380 §4 convention");
+        assert_eq!(
+            inv0(&Fq::ZERO),
+            Fq::ZERO,
+            "inv0(0) MUST return 0 per RFC 9380 §4 convention"
+        );
     }
 
     #[test]
@@ -285,28 +299,40 @@ mod tests {
         // below passes for (-Q0, -Q1) and (Q1, Q0) swaps (G1 addition
         // commutative, anti-commutative under negation). These per-point
         // assertions pin branch selection + sign correction individually.
-        assert_eq!(hex::encode(&q0[0..32]),
+        assert_eq!(
+            hex::encode(&q0[0..32]),
             "1e10b19957a0ab51d8ed02605e5fdb691f78e287817525ed109cb0b5b2519723",
-            "Round 1 Q0.x must match gnark-crypto MapToG1");
-        assert_eq!(hex::encode(&q0[32..64]),
+            "Round 1 Q0.x must match gnark-crypto MapToG1"
+        );
+        assert_eq!(
+            hex::encode(&q0[32..64]),
             "0742fdfa5dba51b9c799434e73fbb705930d9e29cefad99b31f7255b0d62d370",
-            "Round 1 Q0.y must match gnark-crypto MapToG1");
-        assert_eq!(hex::encode(&q1[0..32]),
+            "Round 1 Q0.y must match gnark-crypto MapToG1"
+        );
+        assert_eq!(
+            hex::encode(&q1[0..32]),
             "15b1de83d800a488b346a8e46b60404911b9e24f8f0ce295fb1940f2e81fe902",
-            "Round 1 Q1.x must match gnark-crypto MapToG1");
-        assert_eq!(hex::encode(&q1[32..64]),
+            "Round 1 Q1.x must match gnark-crypto MapToG1"
+        );
+        assert_eq!(
+            hex::encode(&q1[32..64]),
             "21e341fa458ee12634b567e980ff1561fba99ef9e6858e30373b2bb5b3fb2ccf",
-            "Round 1 Q1.y must match gnark-crypto MapToG1");
+            "Round 1 Q1.y must match gnark-crypto MapToG1"
+        );
 
         let m = g1_add(&q0, &q1).expect("g1_add must succeed for on-curve inputs");
 
         let m_x_hex = hex::encode(&m[0..32]);
         let m_y_hex = hex::encode(&m[32..64]);
 
-        assert_eq!(m_x_hex, "073d3d00a1c3ca588db79d44202e44b2f45995ddd39e705717c9edfcb79e4371",
-            "Round 1 M.x must match fixture");
-        assert_eq!(m_y_hex, "173e31a5208ea2594cbcb23b5afb3dd930719a4d1a3f877839bb8bdeb3c15084",
-            "Round 1 M.y must match fixture");
+        assert_eq!(
+            m_x_hex, "073d3d00a1c3ca588db79d44202e44b2f45995ddd39e705717c9edfcb79e4371",
+            "Round 1 M.x must match fixture"
+        );
+        assert_eq!(
+            m_y_hex, "173e31a5208ea2594cbcb23b5afb3dd930719a4d1a3f877839bb8bdeb3c15084",
+            "Round 1 M.y must match fixture"
+        );
     }
 
     #[test]
@@ -323,37 +349,54 @@ mod tests {
 
         // T1.03 — individual Q0 / Q1 byte-for-byte assertions against
         // gnark-crypto fixtures (round-9337227.json:30-33).
-        assert_eq!(hex::encode(&q0[0..32]),
+        assert_eq!(
+            hex::encode(&q0[0..32]),
             "0bdac09968c4675115f5173ed5a2af9da4dd42dea8d82824cd45d4e40c52f4c3",
-            "Round 9337227 Q0.x must match gnark-crypto MapToG1");
-        assert_eq!(hex::encode(&q0[32..64]),
+            "Round 9337227 Q0.x must match gnark-crypto MapToG1"
+        );
+        assert_eq!(
+            hex::encode(&q0[32..64]),
             "1db41b01f6e7a7e1463e4eb6dd35ffd39deca11bf020262592c2f2e3a9e871e2",
-            "Round 9337227 Q0.y must match gnark-crypto MapToG1");
-        assert_eq!(hex::encode(&q1[0..32]),
+            "Round 9337227 Q0.y must match gnark-crypto MapToG1"
+        );
+        assert_eq!(
+            hex::encode(&q1[0..32]),
             "2c547cc28601f4c5376d75d935d493dcde85f549ed79c1d136227fa7588a09d8",
-            "Round 9337227 Q1.x must match gnark-crypto MapToG1");
-        assert_eq!(hex::encode(&q1[32..64]),
+            "Round 9337227 Q1.x must match gnark-crypto MapToG1"
+        );
+        assert_eq!(
+            hex::encode(&q1[32..64]),
             "1116342a64c29038836c8b7b8c1270ca8af9535ca542a0aee6d6b82855157ad3",
-            "Round 9337227 Q1.y must match gnark-crypto MapToG1");
+            "Round 9337227 Q1.y must match gnark-crypto MapToG1"
+        );
 
         let m = g1_add(&q0, &q1).expect("g1_add must succeed for on-curve inputs");
 
         let m_x_hex = hex::encode(&m[0..32]);
         let m_y_hex = hex::encode(&m[32..64]);
 
-        assert_eq!(m_x_hex, "1626082c3dd0751bdaaf8c3e709b5dd7cdedf45d4e81a5aa3e270f1e78924b32",
-            "Round 9337227 M.x must match fixture");
-        assert_eq!(m_y_hex, "2bf29ab3af54dfe3c053ad4efa93db05d3586368463e9d7334c7ba61f6f4e955",
-            "Round 9337227 M.y must match fixture");
+        assert_eq!(
+            m_x_hex, "1626082c3dd0751bdaaf8c3e709b5dd7cdedf45d4e81a5aa3e270f1e78924b32",
+            "Round 9337227 M.x must match fixture"
+        );
+        assert_eq!(
+            m_y_hex, "2bf29ab3af54dfe3c053ad4efa93db05d3586368463e9d7334c7ba61f6f4e955",
+            "Round 9337227 M.y must match fixture"
+        );
     }
 
     #[test]
     fn map_to_point_u_zero() {
         let u = Fq::ZERO;
-        let result = map_to_point(&u).expect("u=0 must succeed (one of x_i is a QR by SVDW theorem)");
+        let result =
+            map_to_point(&u).expect("u=0 must succeed (one of x_i is a QR by SVDW theorem)");
         let x = fq_from_be_bytes(result[0..32].try_into().unwrap());
         let y = fq_from_be_bytes(result[32..64].try_into().unwrap());
-        assert_eq!(y.square(), x.square() * x + Fq::from(3u64), "u=0 result must be on curve");
+        assert_eq!(
+            y.square(),
+            x.square() * x + Fq::from(3u64),
+            "u=0 result must be on curve"
+        );
     }
 
     #[test]
@@ -362,7 +405,11 @@ mod tests {
         let result = map_to_point(&u).expect("u=1 must succeed");
         let x = fq_from_be_bytes(result[0..32].try_into().unwrap());
         let y = fq_from_be_bytes(result[32..64].try_into().unwrap());
-        assert_eq!(y.square(), x.square() * x + Fq::from(3u64), "u=1 result must be on curve");
+        assert_eq!(
+            y.square(),
+            x.square() * x + Fq::from(3u64),
+            "u=1 result must be on curve"
+        );
     }
 
     #[test]
@@ -371,14 +418,18 @@ mod tests {
         let result = map_to_point(&u).expect("u=p-1 must succeed");
         let x = fq_from_be_bytes(result[0..32].try_into().unwrap());
         let y = fq_from_be_bytes(result[32..64].try_into().unwrap());
-        assert_eq!(y.square(), x.square() * x + Fq::from(3u64), "u=p-1 result must be on curve");
+        assert_eq!(
+            y.square(),
+            x.square() * x + Fq::from(3u64),
+            "u=p-1 result must be on curve"
+        );
     }
 
     #[test]
     fn all_svdw_branches_exercised() {
         // Scan first 200 rounds to find inputs that exercise each x-candidate branch
-        use anchor_lang::solana_program::keccak;
         use super::super::expand_message::hash_to_field;
+        use anchor_lang::solana_program::keccak;
 
         let mut hit_x1 = false;
         let mut hit_x2 = false;
@@ -418,10 +469,14 @@ mod tests {
         let x2 = C2 + tv5;
 
         let gx1 = x1.square() * x1 + B;
-        if gx1.sqrt().is_some() { return 1; }
+        if gx1.sqrt().is_some() {
+            return 1;
+        }
 
         let gx2 = x2.square() * x2 + B;
-        if gx2.sqrt().is_some() { return 2; }
+        if gx2.sqrt().is_some() {
+            return 2;
+        }
 
         3
     }

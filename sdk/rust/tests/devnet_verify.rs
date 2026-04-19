@@ -45,8 +45,7 @@ fn get_payer() -> Keypair {
         "{}/.config/solana/alea-deployer.json",
         std::env::var("HOME").expect("HOME must be set")
     );
-    read_keypair_file(&wallet_path)
-        .unwrap_or_else(|_| panic!("keypair not found at {wallet_path}"))
+    read_keypair_file(&wallet_path).unwrap_or_else(|_| panic!("keypair not found at {wallet_path}"))
 }
 
 /// Build the serialized data for a `verify(round, signature)` instruction.
@@ -140,9 +139,17 @@ fn submit_and_get_meta(
     };
 
     for attempt in 0..15 {
-        std::thread::sleep(std::time::Duration::from_secs(if attempt == 0 { 2 } else { 2 }));
+        std::thread::sleep(std::time::Duration::from_secs(if attempt == 0 {
+            2
+        } else {
+            2
+        }));
         if let Ok(confirmed) = rpc.get_transaction_with_config(&sig, confirmed_config) {
-            let meta = confirmed.transaction.meta.as_ref().expect("meta must be present");
+            let meta = confirmed
+                .transaction
+                .meta
+                .as_ref()
+                .expect("meta must be present");
             let meta_err = meta.err.as_ref().map(|e| format!("{e:?}"));
             let return_data = {
                 use solana_transaction_status::option_serializer::OptionSerializer;
@@ -208,7 +215,10 @@ fn verify_round_1_fixture_against_devnet() {
 
     println!(
         "[devnet_verify] round 1 ok: tx={sig_str} randomness=0x{}",
-        randomness.iter().fold(String::new(), |mut s, b| { s.push_str(&format!("{b:02x}")); s })
+        randomness.iter().fold(String::new(), |mut s, b| {
+            s.push_str(&format!("{b:02x}"));
+            s
+        })
     );
 }
 
@@ -249,7 +259,10 @@ fn verify_round_9337227_fixture() {
 
     println!(
         "[devnet_verify] round 9337227 ok: tx={sig_str} randomness=0x{}",
-        randomness.iter().fold(String::new(), |mut s, b| { s.push_str(&format!("{b:02x}")); s })
+        randomness.iter().fold(String::new(), |mut s, b| {
+            s.push_str(&format!("{b:02x}"));
+            s
+        })
     );
 }
 
@@ -273,13 +286,11 @@ fn wrong_round_fails_with_6000() {
 
     let (sig_str, meta_err, _return_data) = submit_and_get_meta(&rpc, &tx);
 
-    let err_str = meta_err.unwrap_or_else(|| {
-        panic!("wrong-round tx must fail on-chain; got success\ntx: {sig_str}")
-    });
+    let err_str = meta_err
+        .unwrap_or_else(|| panic!("wrong-round tx must fail on-chain; got success\ntx: {sig_str}"));
 
-    let code = extract_custom_error_code(&err_str).unwrap_or_else(|| {
-        panic!("expected Custom error code in: {err_str}\ntx: {sig_str}")
-    });
+    let code = extract_custom_error_code(&err_str)
+        .unwrap_or_else(|| panic!("expected Custom error code in: {err_str}\ntx: {sig_str}"));
 
     assert_eq!(
         code, 6000,

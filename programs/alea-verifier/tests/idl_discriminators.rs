@@ -61,7 +61,12 @@ fn idl_instruction_discriminators_match_anchor_convention() {
 
     assert_discriminator(&idl, "instructions", "initialize", "global:initialize");
     assert_discriminator(&idl, "instructions", "verify", "global:verify");
-    assert_discriminator(&idl, "instructions", "update_config", "global:update_config");
+    assert_discriminator(
+        &idl,
+        "instructions",
+        "update_config",
+        "global:update_config",
+    );
     // Stage 9 POSTFIX-T3 (P07+P08 2-source convergence) — pin the
     // map_to_point_debug discriminator added in Wave I. Gate against
     // future IDL edits that would break the T1.04 parity test harness.

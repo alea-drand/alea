@@ -1,7 +1,7 @@
 //! Account types and helpers for Alea CPI consumers.
 
-use anchor_lang::prelude::*;
 use alea_verifier::program::AleaVerifier as AleaVerifierProgram;
+use anchor_lang::prelude::*;
 
 pub use alea_verifier::state::Config;
 
