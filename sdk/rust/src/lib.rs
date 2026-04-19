@@ -33,13 +33,13 @@
 //!         alea_sdk::is_round_recent(round, &ctx.accounts.alea_config, &ctx.accounts.clock, MAX_BEACON_AGE_SECONDS),
 //!         YourError::StaleBeacon,
 //!     );
-//!     // One-line CPI
+//!     // One-line CPI. Returns VerifiedRandomness (must_use wrapper).
 //!     let randomness = alea_sdk::cpi::verify(
 //!         ctx.accounts.alea_program.to_account_info(),
 //!         ctx.accounts.alea_config.to_account_info(),
 //!         ctx.accounts.payer.to_account_info(),
 //!         round, sig,
-//!     )?;
+//!     )?.into_inner();
 //!     // Read IMMEDIATELY — Solana return data is overwritten by any subsequent CPI
 //!     let random_value = u64::from_le_bytes(randomness[0..8].try_into().unwrap());
 //!     // … use randomness …
@@ -101,6 +101,7 @@ pub mod errors;
 pub use accounts::Config;
 pub use alea_verifier::errors::AleaError;
 pub use alea_verifier::program::AleaVerifier;
+pub use cpi::VerifiedRandomness;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::clock::Clock;
