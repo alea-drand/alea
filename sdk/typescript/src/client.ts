@@ -7,15 +7,22 @@ import {
   Commitment,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import { DEVNET_PROGRAM_ID } from "./constants.js";
 import { fetchBeacon, getCurrentRound } from "./drand.js";
 import { getConfigAddress } from "./instruction.js";
 import { AleaError, ERRORS } from "./errors.js";
 
-// @ts-ignore
-import idlJson from "./idl/alea_verifier.json" assert { type: "json" };
-
-const idl = idlJson as Idl;
+// Load IDL via readFileSync. Avoids the Node-version-incompatible
+// `import ... assert { type: "json" }` / `with { type: "json" }` syntax
+// split (Node 18 supports only `assert`; Node 21+ supports only `with`).
+// The IDL is bundled at dist/idl/ and src/idl/ per package.json `files`.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const idlPath = join(__dirname, "idl", "alea_verifier.json");
+const idl = JSON.parse(readFileSync(idlPath, "utf-8")) as Idl;
 
 // T2.07 — structural discriminant: WalletContextState/AnchorWallet have sendTransaction,
 // Keypair does not. Works without importing wallet-adapter types at runtime.
