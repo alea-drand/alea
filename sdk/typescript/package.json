@@ -23,7 +23,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepublishOnly": "npm run build && cp -r src/idl dist/idl",
+    "prepublishOnly": "npm run build && mkdir -p dist/idl && cp src/idl/* dist/idl/",
     "test": "vitest run",
     "test:devnet": "ALEA_DEVNET_TESTS=1 vitest run tests/devnet_integration.test.ts"
   },
