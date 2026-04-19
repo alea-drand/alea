@@ -1,8 +1,16 @@
-// @alea/sdk — public exports (Phase 4 skeleton; full v1 surface lands in
-// subsequent commits per build-spec/sdk/typescript.md T2.Q).
-//
-// Full implementation spans: constants, drand client (5-endpoint fallback),
-// IDL-based instruction construction, getVerifiedRandomness (dual-signer),
-// isRoundRecent (pure port of Rust helper), error codes (2001 + 6000-6009).
+// @alea/sdk — public API surface per T2.Q
 
-export const PLACEHOLDER_PHASE_4_SKELETON = true as const;
+export { getVerifiedRandomness, verifyDrandBeacon } from "./client.js";
+export { fetchBeacon, getCurrentRound, getRoundAt, isRoundRecent } from "./drand.js";
+export { createVerifyInstruction, getConfigAddress } from "./instruction.js";
+export {
+  DRAND_CHAIN_HASH,
+  DRAND_GENESIS_TIME,
+  DRAND_PERIOD,
+  DRAND_ENDPOINTS,
+  DEVNET_PROGRAM_ID,
+  MAINNET_PROGRAM_ID,
+} from "./constants.js";
+export { AleaError, ERRORS } from "./errors.js";
+export type { DrandBeacon } from "./drand.js";
+export type { DrandConfig, SolanaClock, BeaconResult, VerifyOptions } from "./types.js";
