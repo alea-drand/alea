@@ -1,0 +1,16 @@
+# Alea funding — OSS public good support channels.
+# These surface as a "Sponsor" button at the top of the GitHub repo page.
+# Populate the handles you want to expose; remove or comment out the rest.
+# Docs: https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# github: []              # your GitHub Sponsors handle (e.g., [qnapz])
+# custom: []              # any custom URLs (e.g., ["https://alea.so/sponsor"])
+# open_collective:        # open_collective handle
+# ko_fi:                  # ko-fi handle
+# patreon:                # patreon handle
+# issuehunt:              # issuehunt handle
+
+# Alea is currently unfunded. Grant applications are in flight. If you'd like
+# to sponsor the Tier B maintenance commitment ($15K-$75K, 6-12 months full-
+# time), open a GitHub issue to coordinate — we'll configure the appropriate
+# channel and pin the handle here.
