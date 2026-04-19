@@ -1,0 +1,45 @@
+{
+  "name": "@alea/sdk",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "TypeScript SDK for Alea — drand BN254 randomness verification on Solana",
+  "repository": "https://github.com/alea-drand/alea",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "src/idl/**",
+    "README.md",
+    "CAVEATS.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./idl/alea_verifier.json": "./dist/idl/alea_verifier.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build && cp -r src/idl dist/idl",
+    "test": "vitest run",
+    "test:devnet": "ALEA_DEVNET_TESTS=1 vitest run tests/devnet_integration.test.ts"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95",
+    "@coral-xyz/anchor": "^0.30.1",
+    "@noble/hashes": "^1.5"
+  },
+  "peerDependenciesMeta": {
+    "@solana/wallet-adapter-base": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.4",
+    "vitest": "^1.6",
+    "@types/node": "^20"
+  }
+}
