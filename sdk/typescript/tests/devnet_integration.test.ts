@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Connection, Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { readFileSync } from "fs";
+import { homedir } from "os";
 import { verifyDrandBeacon } from "../src/client.js";
 import { DEVNET_PROGRAM_ID } from "../src/constants.js";
 import { AleaError } from "../src/errors.js";
@@ -18,25 +20,45 @@ const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 let payer: Keypair;
 let funded = false;
 
+function loadKeypairFromFile(p: string): Keypair {
+  const raw = JSON.parse(readFileSync(p, "utf-8")) as number[];
+  return Keypair.fromSecretKey(Uint8Array.from(raw));
+}
+
 beforeAll(async () => {
   if (!ENABLED) return;
 
-  payer = Keypair.generate();
+  // Prefer ANCHOR_WALLET or the default deployer path — avoids airdrop faucet dependency
+  const walletPath =
+    process.env["ANCHOR_WALLET"] ??
+    `${homedir()}/.config/solana/alea-deployer.json`;
+
   try {
-    const sig = await connection.requestAirdrop(
-      payer.publicKey,
-      0.1 * LAMPORTS_PER_SOL,
-    );
-    await connection.confirmTransaction(sig, "confirmed");
+    payer = loadKeypairFromFile(walletPath);
     const bal = await connection.getBalance(payer.publicKey);
     funded = bal >= 0.01 * LAMPORTS_PER_SOL;
+    if (!funded) {
+      console.warn(`[devnet] Wallet at ${walletPath} has < 0.01 SOL. Trying airdrop...`);
+      const sig = await connection.requestAirdrop(payer.publicKey, 0.1 * LAMPORTS_PER_SOL);
+      await connection.confirmTransaction(sig, "confirmed");
+      const bal2 = await connection.getBalance(payer.publicKey);
+      funded = bal2 >= 0.01 * LAMPORTS_PER_SOL;
+    }
   } catch {
-    funded = false;
+    // Wallet file not found — fall back to ephemeral + airdrop
+    payer = Keypair.generate();
+    try {
+      const sig = await connection.requestAirdrop(payer.publicKey, 0.1 * LAMPORTS_PER_SOL);
+      await connection.confirmTransaction(sig, "confirmed");
+      const bal = await connection.getBalance(payer.publicKey);
+      funded = bal >= 0.01 * LAMPORTS_PER_SOL;
+    } catch {
+      funded = false;
+    }
   }
+
   if (!funded) {
-    console.warn(
-      "[devnet] Airdrop failed (faucet dry). Skipping all devnet tests.",
-    );
+    console.warn("[devnet] No funded wallet available. Skipping all devnet tests.");
   }
 });
 
