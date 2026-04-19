@@ -26,9 +26,9 @@ This product includes software and algorithm specifications developed by:
 
    SVDW hash-to-curve algorithm and BN254 field constants (C1-C4, Z) were
    ported from the Solidity reference implementation in
-   `contracts/BLS.sol`. See ADR 0011 in build-spec/decisions/ for
-   attribution details. The five SVDW constants were independently
-   re-verified from first principles (see program/svdw.md).
+   `contracts/BLS.sol`. The five SVDW constants were independently
+   re-verified from first principles and cross-validated against
+   gnark-crypto + noble-curves.
 
 2. drand / League of Entropy
    Apache License 2.0

@@ -269,7 +269,7 @@ solana-keygen pubkey /tmp/my-program-id.json
 This is an Anchor UX issue, not an Alea-specific one, but new consumers
 hit it on first integration.
 
-See [`2026-04-19-solana-bpf-rustc-lag-external-consumers`](https://github.com/alea-drand/alea/blob/main/build-spec/decisions/) for the full list of commonly-affected transitives (updated as Solana's toolchain evolves).
+This pattern applies to any transitive crate that assumes a newer rustc than Solana's BPF toolchain ships. If a new `cargo build-sbf` failure surfaces on a future crate, the fix is the same: pin the offending dep to an older compatible version in your consumer's `Cargo.toml`.
 
 ### `anchor build` fails with `E0599: no method named 'source_file'`
 
