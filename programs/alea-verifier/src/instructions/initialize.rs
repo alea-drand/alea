@@ -75,13 +75,12 @@ pub fn initialize_handler(
     period: u64,
     chain_hash: [u8; 32],
 ) -> Result<()> {
-    // Wave X+1 (Codex C HIGH, 2026-04-17) — upgrade-authority gate.
-    // MUST be the first check so no state writes occur on unauthorized
-    // calls. An immutable program (ADR 0009 Phase 5+) would have
-    // `upgrade_authority_address == None`, in which case nobody can
-    // initialize via this code path — that is the correct semantics
-    // (immutable program's Config must be set before authority is
-    // revoked).
+    // Upgrade-authority gate. MUST be the first check so no state
+    // writes occur on unauthorized calls. An immutable program (after
+    // authority is zeroed) would have `upgrade_authority_address ==
+    // None`, in which case nobody can initialize via this code path —
+    // that is the correct semantics (immutable program's Config must
+    // be set before authority is revoked).
     let upgrade_authority = ctx.accounts.program_data.upgrade_authority_address;
     require!(
         upgrade_authority == Some(ctx.accounts.authority.key()),

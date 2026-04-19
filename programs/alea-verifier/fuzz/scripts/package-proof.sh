@@ -15,7 +15,9 @@
 
 set -euo pipefail
 
-REPO="/Users/aaron/dev/work/alea"
+# Resolve repo root relative to this script's location (portable across
+# developer machines + CI runners) with an env override for CI.
+REPO="${ALEA_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 FUZZ_DIR="$REPO/programs/alea-verifier/fuzz"
 PROGRAM_DIR="$REPO/programs/alea-verifier"
 LOGS="$FUZZ_DIR/run-logs"
@@ -164,6 +166,6 @@ log "  SHA256:  $SHA"
 log "  Meta:    $FUZZ_DIR/campaign-metadata.json"
 log "  Env:     $FUZZ_DIR/environment.txt"
 log "=================================================================="
-log "Next: write build-spec/audit-r5/STAGE-5B-COMPLETE.md and commit the"
-log "     completion report (tarball stays gitignored, public release tag"
-log "     uploads the proof tarball as a GitHub release asset)."
+log "Next: review run-logs/ for any anomalies, commit a completion report"
+log "      locally, and if this is a release-gated campaign, upload the"
+log "      tarball as a GitHub release asset (tarball stays gitignored)."

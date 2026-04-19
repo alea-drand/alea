@@ -22,8 +22,13 @@ import struct
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path("/Users/aaron/dev/work/alea")
-FIXTURES = REPO_ROOT / "build-spec" / "testing" / "fixtures"
+# Resolve repo root relative to this script's location.
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent.parent.parent.parent
+# Fixtures are historically kept in a private directory; the corpus seeds
+# below are inlined where possible so this script is runnable without
+# external fixture files.
+FIXTURES = REPO_ROOT / "build-spec" / "testing" / "fixtures"  # optional; may not exist
 CORPUS = REPO_ROOT / "programs" / "alea-verifier" / "fuzz" / "corpus" / "verify_beacon"
 
 

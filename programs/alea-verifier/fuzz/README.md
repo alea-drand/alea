@@ -137,7 +137,7 @@ The original handoff called for 3×8h sequential runs (24h wall time). That was 
 ### One-command launch
 
 ```bash
-cd /Users/aaron/dev/work/alea/programs/alea-verifier/fuzz
+cd programs/alea-verifier/fuzz        # from repo root
 bash scripts/launch.sh --dry-run      # validate env + build + corpus seed
 bash scripts/launch.sh --smoke-only   # 30s × 3 targets, fail fast on crash
 bash scripts/launch.sh                # full campaign: smoke + tmux 3-pane 4h

@@ -15,9 +15,8 @@
 //
 // CI usage (intended):
 //   Run on every PR that modifies constants.rs or this script.
-//   Writes build-spec/audit-r5/evmnet-pubkey-attestation.json.
-//   Attestation commit SHA + timestamp is linked from ADR 0027 Status
-//   field for external auditor reference.
+//   Writes an attestation JSON file with the timestamp + expected hex
+//   for external-auditor reference.
 //
 // Run:
 //   cd scripts
