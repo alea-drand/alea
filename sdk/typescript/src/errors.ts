@@ -37,4 +37,5 @@ export const ERRORS: Readonly<Record<number, string>> = Object.freeze({
   6100: "DrandFetchFailed: all drand endpoints failed after retries",
   6101: "DrandRoundMismatch: drand endpoint returned a different round than requested (possibly compromised endpoint)",
   6102: "InvalidInput: SDK-level input validation failed (bad hex, wrong signature length, negative/oversize round, null signer)",
+  6103: "Aborted: operation aborted by caller AbortSignal before tx was broadcast",
 });

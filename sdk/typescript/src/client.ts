@@ -85,6 +85,21 @@ export async function verifyDrandBeacon(args: {
   signature: Uint8Array;
   programId?: PublicKey;
   computeUnits?: number;
+  /**
+   * Abort signal — when aborted BEFORE the tx is sent, the call throws
+   * AleaError 6103 and no tx lands on-chain. Once sent, the abort is a
+   * no-op (we can't un-send a Solana tx). Use for navigation-away and
+   * UI timeout patterns.
+   */
+  signal?: AbortSignal;
+  /**
+   * Override the default `skipPreflight: true`. Setting this to `false`
+   * enables Solana preflight simulation — useful for debugging an
+   * integration locally, but likely to fail under live devnet/mainnet
+   * load because Alea's pairing CU can outpace the preflight blockhash
+   * window. Default stays `true`.
+   */
+  skipPreflight?: boolean;
 }): Promise<Uint8Array> {
   // Phase 4.5 input validation (T1-04, T1-05, T1-06): defensive checks at
   // the SDK boundary so consumers get readable AleaError instead of opaque
@@ -163,17 +178,43 @@ export async function verifyDrandBeacon(args: {
     .preInstructions([cuIx])
     .transaction();
 
+  // Phase 4.5 T2-15: early-abort check before any network calls. Throws
+  // AleaError 6103 if the user's AbortSignal is already aborted (e.g.,
+  // they navigated away before we started).
+  if (args.signal?.aborted) {
+    throw new AleaError(6103, "verifyDrandBeacon aborted by caller");
+  }
+
+  // Phase 4.5 T2-16: verify the wallet actually exposes signTransaction
+  // before we lean on it. Hardware and watch-only wallets can expose a
+  // partial WalletContextState where signTransaction is undefined,
+  // producing an opaque TypeError below.
+  if (typeof wallet.signTransaction !== "function") {
+    throw new AleaError(
+      6102,
+      "InvalidInput: signer.signTransaction is not a function — ensure wallet is connected and supports signing (watch-only / hardware wallets without signTransaction are not supported)",
+    );
+  }
+
   const { blockhash, lastValidBlockHeight } = await args.connection.getLatestBlockhash("confirmed");
   anchorTx.recentBlockhash = blockhash;
   anchorTx.feePayer = wallet.publicKey;
   const signedTx = await wallet.signTransaction(anchorTx);
 
-  // skipPreflight: true is REQUIRED for Alea verify — pairing outpaces the
-  // preflight blockhash window under high-CU load. See framework-gotchas
-  // and scripts/devnet-verify-loop.ts (all verify call sites use true).
+  // Phase 4.5 T2-15: second abort checkpoint after signing. Still
+  // recoverable because the tx hasn't been broadcast yet. Once we send,
+  // aborts are a no-op.
+  if (args.signal?.aborted) {
+    throw new AleaError(6103, "verifyDrandBeacon aborted by caller after signing (tx NOT sent)");
+  }
+
+  // Phase 4.5 T2-17: skipPreflight defaults to true (required for live
+  // devnet/mainnet CU envelope), but consumers can override for local
+  // debugging.
+  const skipPreflight = args.skipPreflight ?? true;
   const tx: string = await args.connection.sendRawTransaction(
     signedTx.serialize(),
-    { skipPreflight: true, maxRetries: 3 },
+    { skipPreflight, maxRetries: 3 },
   );
 
   // Wait for confirmation. Don't use confirmTransaction's promise because on
@@ -254,9 +295,13 @@ export async function getVerifiedRandomness(options: {
   programId?: PublicKey;
   round?: bigint;
   computeUnits?: number;
+  /** Abort signal threaded through fetchBeacon + verifyDrandBeacon. */
+  signal?: AbortSignal;
+  /** See verifyDrandBeacon.skipPreflight. Default true. */
+  skipPreflight?: boolean;
 }): Promise<Uint8Array> {
   const round = options.round ?? getCurrentRound();
-  const beacon = await fetchBeacon(round);
+  const beacon = await fetchBeacon(round, { signal: options.signal });
 
   return verifyDrandBeacon({
     connection: options.connection,
@@ -265,5 +310,7 @@ export async function getVerifiedRandomness(options: {
     signature: beacon.signature,
     programId: options.programId,
     computeUnits: options.computeUnits,
+    signal: options.signal,
+    skipPreflight: options.skipPreflight,
   });
 }

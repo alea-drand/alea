@@ -14,7 +14,7 @@ This document is required reading before integrating alea-sdk into a production 
 
 ## 2. External Audit
 
-**Status:** Internal audit clean — 10 Claude persona rounds + 5 Codex persona rounds, averaged 8.66/10 arbitrated score. All Tier-1 findings resolved or explicitly deferred to Phase 5. No external paid firm review has been performed.
+**Status:** Multi-pass internal audit — 15-round internal persona audit (10 Claude + 5 Codex, averaged 8.66/10 arbitrated), plus a 12-agent pre-publish audit (8 cold-read personas + 4 adversarial red-team agents) run Phase 4.5 2026-04-19. Zero exploitable cryptographic or replay vulnerabilities found; all T1 findings against mandatory-constraint-following consumers resolved. No external paid firm review has been performed.
 
 **Phase 5 resolution:** Phase 5 gate requires a paid external audit before mainnet deployment. CPI interface is frozen per ADR 0028 — audit findings cannot require breaking changes to `verify` v1.
 

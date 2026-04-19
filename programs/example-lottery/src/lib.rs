@@ -9,6 +9,23 @@
 //!
 //! This is a test-only / demonstration program. `publish = false` in Cargo.toml.
 //! Use `anchor build --no-idl -p example-lottery` for local testing.
+//!
+//! # Correlated-randomness warning (Phase 4.5 Marcus T2)
+//!
+//! Multiple bets resolving against the SAME drand round share the same 32
+//! bytes of randomness — each bet merely samples a different u64 window
+//! (e.g., bytes[0..8] vs bytes[8..16]). For a 50/50 lottery this is
+//! economically neutral (both outcomes are still 50/50 per-bet). For
+//! asymmetric games (house-edge lotteries, tournaments with payout tiers)
+//! players can COORDINATE their commits so all resolve on the same round,
+//! effectively playing against each other instead of against the house.
+//!
+//! Mitigations for asymmetric consumers:
+//! - Require each resolution to use a UNIQUE round (track used_rounds
+//!   in a PDA set)
+//! - Or bucket bets by ticket count and force rounds apart by commit-slot
+//!   spacing such that two bets cannot resolve on the same round
+//! - Or derive per-bet randomness = sha256(round_randomness || bet_pda_key)
 
 // Suppress Anchor 0.30.1's harmless `anchor-debug` cfg warning (same as
 // programs/alea-verifier/src/lib.rs).
@@ -51,9 +68,23 @@ pub mod example_lottery {
         // already observed, defeating commit-reveal's anti-front-run property.
         let alea_config = &ctx.accounts.alea_config;
         let clock = &ctx.accounts.clock;
-        let current_ts = clock.unix_timestamp as u64;
-        // +period ensures the round must be emitted at least one period AFTER
-        // commit — the player cannot have observed it at commit time.
+        // Phase 4.5 T2-01 symmetry with alea_sdk: clamp negative i64 before cast.
+        let current_ts = clock.unix_timestamp.max(0) as u64;
+        // Anti-front-run floor: pick the smallest round whose emission time is
+        // strictly AFTER current_ts, so the player cannot have observed its
+        // randomness at commit time.
+        //
+        // emission_time(R) = genesis + (R-1) * period.
+        // We want R such that emission_time(R) > current_ts, i.e.
+        //     R > (current_ts - genesis) / period + 1
+        //
+        // In integer math this simplifies to:
+        //     R >= floor((current_ts - genesis) / period) + 2
+        //
+        // Equivalently (used here): add `period` to current_ts, floor-divide,
+        // and add 1. When current_ts sits exactly on a period boundary the two
+        // formulas agree; when it's mid-period they still agree because the
+        // extra `period` bumps the floor-div exactly when the boundary crosses.
         let min_allowed_ts = current_ts.saturating_add(alea_config.period);
         let min_allowed_round = min_allowed_ts
             .saturating_sub(alea_config.genesis_time)
@@ -147,28 +178,44 @@ pub mod example_lottery {
             player_wins
         );
 
-        if player_wins {
-            // Transfer locked SOL from Bet PDA back to player.
-            **ctx
-                .accounts
-                .bet
-                .to_account_info()
-                .try_borrow_mut_lamports()? -= amount;
-            **ctx.accounts.player.try_borrow_mut_lamports()? += amount;
-            msg!("resolve_bet: player {} won {} lamports", player_key, amount);
-        } else {
-            // Transfer locked SOL from Bet PDA to house (payer acts as house).
-            **ctx
-                .accounts
-                .bet
-                .to_account_info()
-                .try_borrow_mut_lamports()? -= amount;
-            **ctx.accounts.payer.try_borrow_mut_lamports()? += amount;
+        // Phase 4.5 T1-16 rewrite: use checked arithmetic to eliminate the
+        // underflow footgun previous direct `-=` had, and keep the payout
+        // logic safe regardless of griefing.
+        //
+        // Semantics by outcome:
+        //   - player_wins: do nothing manual here. `close = player` at
+        //     instruction end moves the PDA's remaining lamports (rent +
+        //     locked amount) to `player`. Net to player: +amount.
+        //   - player_loses: explicitly transfer `amount` from Bet PDA to
+        //     payer via checked math. `close = player` then moves the
+        //     remaining rent-exempt balance back to player (refund).
+        //     Net to payer: +amount; net to player: 0 (rent in, rent out).
+        //
+        // Checked math converts what was previously a latent panic on
+        // underflow into a clean GameError that a consumer can handle.
+        if !player_wins {
+            let bet_info = ctx.accounts.bet.to_account_info();
+            let current_bet_lamports = bet_info.lamports();
+            let new_bet_lamports = current_bet_lamports
+                .checked_sub(amount)
+                .ok_or(GameError::InsufficientFunds)?;
+            let payer_info = ctx.accounts.payer.to_account_info();
+            let new_payer_lamports = payer_info
+                .lamports()
+                .checked_add(amount)
+                .ok_or(GameError::PayoutOverflow)?;
+
+            **bet_info.try_borrow_mut_lamports()? = new_bet_lamports;
+            **payer_info.try_borrow_mut_lamports()? = new_payer_lamports;
+
             msg!(
                 "resolve_bet: house won {} lamports from {}",
                 amount,
                 player_key
             );
+        } else {
+            // Winning path: close = player constraint handles the payout.
+            msg!("resolve_bet: player {} won {} lamports", player_key, amount);
         }
 
         Ok(())

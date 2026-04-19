@@ -10,7 +10,7 @@ The program at `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U` is deployed on **S
 
 ## 2. Internal Audit Only (Phase 5 Resolution: External Paid Audit)
 
-The Alea verifier has passed an internal audit (10 Claude + 5 Codex rounds, average score 8.66/10, zero critical findings). An external paid security firm audit is planned for Phase 5 before mainnet. Do not use in production until that audit is complete.
+The Alea verifier has passed multi-pass internal audits: 15-round persona audit (10 Claude + 5 Codex, averaged 8.66/10, zero critical findings), plus a pre-publish 12-agent audit (8 cold-read personas + 4 adversarial red-team agents) run 2026-04-19 — zero exploitable cryptographic or replay vulnerabilities, zero T1 findings against mandatory-constraint-following consumers. An external paid security firm audit is planned for Phase 5 before mainnet. Do not use in production until that audit is complete.
 
 ## 3. Deployer Keypair (Phase 5 Resolution: Squads 2-of-3 Multisig)
 
