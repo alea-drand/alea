@@ -119,7 +119,11 @@ pub fn verify<'info>(
     // (raw process_instruction handlers, governance relays, CPI
     // forwarders) bypass that check. A runtime owner assertion here
     // closes the gap at ~200 CU cost (0.04% of the 900K budget).
-    require_keys_eq!(*config.owner, crate::PROGRAM_ID, crate::AleaError::WrongPubkey);
+    require_keys_eq!(
+        *config.owner,
+        crate::PROGRAM_ID,
+        crate::AleaError::WrongPubkey
+    );
     let accounts = alea_verifier::cpi::accounts::Verify {
         config: config.clone(),
         payer: payer.clone(),

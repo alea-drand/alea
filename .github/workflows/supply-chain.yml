@@ -65,16 +65,22 @@ jobs:
         # --audit-level=moderate: fail only on moderate/high/critical.
         run: npm audit --omit=dev --audit-level=moderate
 
-  gitleaks:
-    name: gitleaks (secret scan)
+  secret-scan:
+    name: trufflehog (secret scan)
     runs-on: ubuntu-latest
+    # Swapped from gitleaks/gitleaks-action@v2 — that action requires a paid
+    # license for GitHub organization repos (we're under alea-drand). trufflehog
+    # is fully free + open-source under AGPL-3.0 and catches the same class
+    # of committed secrets.
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # gitleaks needs full history
+          fetch-depth: 0
 
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          # GITLEAKS_LICENSE is not required for public repos; action runs free.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run trufflehog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha || 'main' }}
+          head: HEAD
+          extra_args: --results=verified,unknown
