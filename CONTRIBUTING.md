@@ -4,7 +4,7 @@ Thanks for your interest in contributing. Alea is a small, public-good project �
 
 ## Solo-Maintainer Caveat
 
-Alea is currently **Tier A** (default, no grant): 3 months active support post-mainnet. Response times for issues and PRs are **best-effort** until Tier B activates via grant funding. If you need guaranteed response times for a commercial integration, surface it early via a GitHub issue — we'll figure out a path (e.g., Tier B support if a grant is in-flight, or a fork-and-maintain recommendation).
+Alea is currently solo-maintained and grant-unfunded. Response times for issues and PRs are best-effort. If you need guaranteed response times for a commercial integration, surface it early via a GitHub issue — we'll figure out a path (prioritised support if grant funding is in flight, or a fork-and-maintain recommendation).
 
 ## Prerequisites
 

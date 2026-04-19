@@ -8,7 +8,7 @@
 [![npm](https://img.shields.io/npm/v/@alea-drand/sdk.svg)](https://www.npmjs.com/package/@alea-drand/sdk)
 [![drand](https://img.shields.io/badge/powered%20by-drand-ff6b6b.svg)](https://drand.love)
 
-Alea is the **first production drand BN254 verifier on Solana**. Any Solana program can call `alea_sdk::cpi::verify(program, config, payer, round, signature)` and get 32 bytes of cryptographically verified randomness in a single transaction — no callbacks, no keepers, no off-chain coordinators, no tokens, no fees.
+Alea is an on-chain drand BN254 verifier for Solana. Any Solana program can call `alea_sdk::cpi::verify(program, config, payer, round, signature)` and get 32 bytes of cryptographically verified randomness in a single transaction — no callbacks, no keepers, no off-chain coordinators, no tokens, no protocol fees.
 
 ---
 
@@ -40,7 +40,7 @@ Alea is the **first production drand BN254 verifier on Solana**. Any Solana prog
 
 Alea is a **cryptographic randomness primitive** for Solana. It verifies randomness beacons from [drand](https://drand.love) — the League of Entropy's threshold-signed public randomness network — directly on-chain, using Solana's `alt_bn128_pairing` syscall.
 
-- **drand** is a decentralized network of 23 organizations (Cloudflare, Protocol Labs, Ethereum Foundation, Kudelski Security, cLabs, EPFL, and others) that jointly produces a publicly verifiable randomness beacon every 3 seconds using BLS threshold signatures on the BN254 curve.
+- **drand** is a decentralized network run by the League of Entropy (a coalition of universities, companies, and non-profits including Cloudflare, Protocol Labs, EPFL and others) that jointly produces a publicly verifiable randomness beacon every 3 seconds using BLS threshold signatures on the BN254 curve.
 - **Alea** verifies those beacons on-chain through full BN254 pairing math. If the pairing check passes, the signature is authentic and the 32 bytes returned are the canonical randomness for that round.
 - **The output is deterministic**: any two consumers verifying the same round get the same 32 bytes. This makes Alea well-suited for public-draw semantics (lotteries, tournaments, fair launches) and poorly suited for per-request unique-seed VRF (see the [FAQ](#faq) for per-caller randomness derivation patterns).
 - **It is stateless**: Alea doesn't store beacons. Each `verify` call takes the round number and signature from the caller, checks the pairing, and returns randomness. A single on-chain `Config` PDA holds the drand public key + chain hash — read-only during verification.
@@ -56,7 +56,7 @@ This is not a VRF service in the ORAO/Switchboard sense (per-request oracle). It
 | [ORAO VRF](https://orao.network) | ~$0.15 | Request-then-callback (2 tx) | Single-operator attestation | Trust the operator |
 | [Switchboard](https://switchboard.xyz) randomness | ~$0.01+ | Oracle round trip | Oracle committee attestation | Trust the committee |
 | Commit-reveal (DIY) | 0 | 2 tx + coordinator logic | No cryptographic provenance | Trust your own coordinator |
-| **Alea** | **$0** (~0.000005 SOL tx fee) | **1 CPI call, single tx** | **drand threshold sig (BN254 BLS)** | **Trust drand's 23-org threshold** |
+| **Alea** | **$0** (~0.000005 SOL tx fee) | **1 CPI call, single tx** | **drand threshold sig (BN254 BLS)** | **Trust drand's League-of-Entropy threshold** |
 
 **Alea trades off**: you can't get per-caller unique randomness without consumer-side derivation (see [FAQ](#faq)). For public-draw semantics, that's not a trade-off — it's a feature. Multiple consumers watching the same round arrive at the same bytes independently, which means the "fair draw" is auditable by anyone.
 
@@ -64,16 +64,16 @@ This is not a VRF service in the ORAO/Switchboard sense (per-request oracle). It
 
 ## Status
 
-**v0.1.0 — devnet, published 2026-04-19.**
+**v0.1.0 — devnet release, April 2026.**
 
-- **Devnet:** Live at program `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U`. 10+ live drand rounds verified end-to-end.
-- **Mainnet:** Phase 5 gate — pending (a) external paid security audit, (b) Squads 2-of-3 multisig transition, (c) BPF 6006 None-arm runtime test.
+- **Devnet:** Live at program `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U`. Verified end-to-end against live drand rounds.
+- **Mainnet:** Phase 5 gate — pending (a) external paid security audit, (b) Squads 2-of-3 multisig transition, (c) a remaining open BPF error-path runtime test.
 - **Published SDKs:**
   - [`alea-verifier v0.1.0`](https://crates.io/crates/alea-verifier) on crates.io
   - [`alea-sdk v0.1.0`](https://crates.io/crates/alea-sdk) on crates.io
   - [`@alea-drand/sdk v0.1.0`](https://www.npmjs.com/package/@alea-drand/sdk) on npm
 
-See [CHANGELOG.md](CHANGELOG.md) for full release notes and [`sdk/rust/CAVEATS.md`](sdk/rust/CAVEATS.md) + [`sdk/typescript/CAVEATS.md`](sdk/typescript/CAVEATS.md) for maturity disclosures before integrating in production.
+Read [CHANGELOG.md](CHANGELOG.md) for release notes and [`sdk/rust/CAVEATS.md`](sdk/rust/CAVEATS.md) + [`sdk/typescript/CAVEATS.md`](sdk/typescript/CAVEATS.md) for maturity disclosures before integrating in production.
 
 ---
 
@@ -366,7 +366,7 @@ Canonical source: [`programs/alea-verifier/src/errors.rs`](programs/alea-verifie
 
 ## Security
 
-- **Report vulnerabilities:** [GitHub Security Advisory](https://github.com/alea-drand/alea/security/advisories/new) (preferred) or `security@alea.so` (fallback). Response SLAs: 72h ack / 7d triage / 30d P0 fix. Details in [`.github/SECURITY.md`](.github/SECURITY.md).
+- **Report vulnerabilities:** [GitHub Security Advisory](https://github.com/alea-drand/alea/security/advisories/new) (preferred) or `security@alea.so` (fallback — mail server provisioning pending; use GitHub until then). Pre-multisig response is best-effort within a few days for P0 issues; post-transition the target is 72h ack / 7d triage / 30d P0 fix. Details in [`.github/SECURITY.md`](.github/SECURITY.md).
 - **Bug bounty:** intent documented; activation post-grant. Meaningful reports get credit in release notes (with permission) and potential non-monetary recognition.
 - **Mandatory consumer constraints** (omitting either ships an exploitable program):
   1. `seeds::program = alea_program.key()` on the Config PDA — fake-config defense
@@ -379,35 +379,32 @@ Canonical source: [`programs/alea-verifier/src/errors.rs`](programs/alea-verifie
 
 ## Audit Trail
 
-Alea has undergone **multi-pass independent review**:
+Alea was developed with a self-imposed multi-pass adversarial-review discipline before the v0.1.0 devnet publish:
 
-| Round | Type | Agents | Key findings |
-|-------|------|--------|--------------|
-| R1–R3 (2026-04-14) | 12-persona spec audit | 12 (2 Opus + 10 Sonnet) | 22 T1 resolved; G2 generator coordinate fix (would have silently failed) |
-| R4–R5 (2026-04-08 class) | Fix-pass + re-audit | 12-persona rounds | Average composite 7.6–7.8 across waves |
-| R6–R7 (2026-04-15+) | Codex cross-model | 5-round Opus + Codex | FENDER-002 initialize hardening; BPF 6006 gate |
-| Fuzzing | 3 parallel cargo-fuzz targets | — | **23.82 billion iterations, 0 crashes, 0 memory errors** |
-| Phase 4.5 (2026-04-19) | Pre-publish 12-agent audit | 8 personas + 4 red team | 16 T1 + ~28 T2 resolved — **zero exploitable crypto or replay** |
-| Phase 4.5 integration | 4-agent live integration | 2 first-run + 2 re-verify | 7.7 → 8.3 Rust, 8.0 → 7.8 TS — unanimous YES |
-| Phase 5 (pending) | External paid firm review | — | Mainnet gate |
+- **Specification audits** — several rounds of cold-read persona review against the full build specification (independent adversarial readers on each round), with all Tier-1 findings resolved before implementation started. One round caught a G2 generator coordinate mislabelling that would have silently failed.
+- **Fuzzing** — three parallel cargo-fuzz targets (field arithmetic, SVDW hash-to-curve, and the pairing pipeline) ran for a combined **23.82 billion iterations with 0 crashes and 0 memory errors**. Proof tarballs are attached to the [`v0.2.0-audit-passed`](https://github.com/alea-drand/alea/releases/tag/v0.2.0-audit-passed) GitHub release.
+- **Pre-publish Phase 4.5 audit (2026-04-19)** — 12 cold-read agents (8 consumer-persona reviewers + 4 adversarial red-team agents probing API fuzzing, drand-endpoint hostility, replay/griefing, and cryptographic edge cases) found **zero exploitable crypto or replay vulnerabilities**. 16 Tier-1 and ~28 Tier-2 publish-quality items were resolved before v0.1.0 shipped. Findings are public under [`audit/phase-4.5/`](audit/phase-4.5/).
+- **Pre-publish integration audit** — four clean-room integration agents (two first-run, two re-verify after fixes) scored the published SDK shape 8.3/10 (Rust) and 7.8/10 (TypeScript) — unanimous publish-ready verdict.
+- **External paid audit** — not yet performed. Required before the Phase 5 mainnet deploy.
 
 Evidence:
-- [`audit/phase-4.5/FINDINGS-CONSOLIDATED.md`](audit/phase-4.5/FINDINGS-CONSOLIDATED.md) — Phase 4.5 tier-breakdown
+- [`audit/phase-4.5/FINDINGS-CONSOLIDATED.md`](audit/phase-4.5/FINDINGS-CONSOLIDATED.md) — Phase 4.5 tier breakdown
 - [`audit/phase-4.5/THREAT-MODEL.md`](audit/phase-4.5/THREAT-MODEL.md) — trusted-vs-untrusted surface enumeration
-- [`validation-report.md`](validation-report.md) — full validation history across phases
-- [v0.2.0-audit-passed](https://github.com/alea-drand/alea/releases/tag/v0.2.0-audit-passed) GitHub release — fuzz tarballs + audit reports
+- [`validation-report.md`](validation-report.md) — validation history across phases
 
 ---
 
 ## Governance & Upgrade Roadmap
 
+Alea is stateless: the on-chain program holds no user funds (no TVL). The upgrade-authority roadmap below is about who can modify the verifier program itself.
+
 | Phase | Authority | Trigger | Status |
 |-------|-----------|---------|--------|
 | v1 (devnet today, mainnet at Phase 5) | Deployer keypair | Initial release | **Current** |
-| v2 | Squads 2-of-3 multisig | **90 days after mainnet** OR $50K TVL OR first external audit (whichever first) | Pending Phase 5 |
-| v3 | Immutable (authority zeroed) | Post-audit + 6 months stable operation | Planned |
+| v2 | Squads 2-of-3 multisig | Within 90 days of mainnet deploy, or at the first external paid audit (whichever first) | Pending Phase 5 |
+| v3 | Immutable (authority zeroed) | After external audit clears and the program operates without critical bugs for a meaningful period on mainnet | Planned |
 
-The v2 multisig transition is a **public commitment**. Failure to execute within 90 days of mainnet deploy is a trust-breaking event. The multisig co-signers will be announced at Phase 5.
+The v2 multisig transition is a public commitment. The co-signers will be named at Phase 5.
 
 **Interface stability guarantee**: the `verify` instruction signature, `Config` account layout, `Verify` accounts struct, return-data format, and `BeaconVerified` event schema are **frozen forever** for the mainnet program ID. Additive-only changes are welcome at minor versions; breaking changes require a new program ID (new deployment, not an upgrade). CI enforces this via the `idl-diff` check on every PR.
 
@@ -445,7 +442,7 @@ A complete reference consumer (commit-reveal lottery with all mandatory + SHOULD
 Not in the classical (per-request-unique) sense. Alea verifies a *public* randomness beacon: everyone resolving against the same drand round gets the same 32 bytes. If you need per-caller unique randomness, derive it consumer-side: `per_caller = sha256(round_randomness || caller_pubkey)`.
 
 **Why drand and not chain-native randomness (slot hashes, recent_blockhashes)?**
-Chain-native sources are grindable or biased by the proposer. drand is threshold-signed by 23 independent organizations, so biasing it requires compromising t+1 of them — a meaningfully different trust model.
+Chain-native sources are grindable or biased by the proposer. drand is threshold-signed by the League of Entropy coalition, so biasing it requires compromising a threshold-sized fraction of the signers — a meaningfully different trust model.
 
 **Why BN254 and not BLS12-381?**
 drand supports multiple curves; their `evmnet` chain uses BN254 specifically so Ethereum + Solana (both of which expose BN254 via precompiles/syscalls) can verify cheaply. The `alt_bn128_pairing` syscall is Alea's critical dependency.
@@ -471,7 +468,7 @@ For devnet integration testing: yes. For mainnet production: no (pending Phase 5
 
 - **[randa-mu/bls-solana](https://github.com/randa-mu/bls-solana)** — Randamu (the organization that operates drand) built a BN254 drand verifier prototype for Solana. **Never deployed** to any Solana cluster (verified via RPC across mainnet/devnet/testnet). Alea completes the job; randa-mu taught us the shape of the problem.
 - **[kevincharm/bls-bn254](https://github.com/kevincharm/bls-bn254)** — Solidity reference implementation. SVDW algorithm and BN254 constants ported from here + cross-validated against gnark-crypto.
-- **[drand / League of Entropy](https://drand.love)** — 23 organizations including Cloudflare, Protocol Labs, Ethereum Foundation, Kudelski Security, cLabs, EPFL, Emerald Onion, University of Chile, Tables, UIUC, others. Thank you for producing the randomness Alea verifies.
+- **[drand / League of Entropy](https://drand.love)** — the coalition of universities, companies, and non-profits that jointly produces the drand randomness beacon Alea verifies.
 - **[Paul Miller's noble libraries](https://paulmillr.com/noble/)** — `@noble/curves` + `@noble/hashes` are the JS reference implementations used for test vector generation.
 - **arkworks ecosystem** — `ark-ff`, `ark-bn254`, `ark-ec`, `ark-serialize` underpin Alea's field arithmetic.
 
@@ -481,7 +478,7 @@ For devnet integration testing: yes. For mainnet production: no (pending Phase 5
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding conventions, and PR process.
 
-**Solo-maintainer caveat:** Tier A response times (3 months post-mainnet, best-effort) apply until grant-funded Tier B activates. If you need guaranteed SLAs for a commercial integration, open an issue — we'll figure out a path (Tier B if grants are in-flight, or a fork-and-maintain recommendation otherwise).
+**Solo-maintainer caveat:** Alea is currently solo-maintained and grant-unfunded. Response times for issues and PRs are best-effort. If you need guaranteed SLAs for a commercial integration, open an issue — we'll figure out a path (prioritised support if grant funding is in flight, or a fork-and-maintain recommendation otherwise).
 
 **The `verify` v1 instruction signature is frozen forever.** Additive changes are welcome; breaking changes require a new program ID (new deployment, not an upgrade). CI enforces this on every PR.
 
