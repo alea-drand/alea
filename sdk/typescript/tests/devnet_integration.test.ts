@@ -124,34 +124,8 @@ describe("devnet integration", () => {
     }
 
     expect(caught).toBeDefined();
-    // Extract error code — Anchor-wrapped or raw InstructionError
-    const code = extractCode(caught);
-    expect(code).toBe(6000);
+    expect(caught).toBeInstanceOf(AleaError);
+    expect((caught as AleaError).code).toBe(6000);
   });
 });
 
-function extractCode(err: unknown): number | undefined {
-  if (!err || typeof err !== "object") return undefined;
-  const e = err as Record<string, unknown>;
-  const anchor =
-    (e["error"] as any)?.errorCode?.number ??
-    (e["errorCode"] as any)?.number ??
-    (typeof e["code"] === "number" ? e["code"] : undefined);
-  if (typeof anchor === "number") return anchor;
-  const ie = (e["InstructionError"] as any[]) ?? undefined;
-  if (Array.isArray(ie) && ie.length === 2) {
-    const inner = ie[1] as Record<string, unknown>;
-    if (inner && typeof inner["Custom"] === "number") return inner["Custom"];
-  }
-  // Try to parse from logs
-  const logs = e["logs"] as string[] | undefined;
-  if (Array.isArray(logs)) {
-    for (const line of logs) {
-      const m = String(line).match(/Error Number: (\d+)/);
-      if (m) return parseInt(m[1]!, 10);
-      const m2 = String(line).match(/custom program error: 0x([0-9a-fA-F]+)/);
-      if (m2) return parseInt(m2[1]!, 16);
-    }
-  }
-  return undefined;
-}
