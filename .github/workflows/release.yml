@@ -9,10 +9,27 @@ on:
 # versions that other crates depend on; npm CAN remove but only within 72h. A
 # broken release published to either registry is unrecoverable for downstream
 # consumers. The `test` job below MUST pass before any publish step runs.
+#
+# Phase 4.5 rewrite:
+# - `anchor test` / `anchor build --verifiable` replaced with
+#   `cargo test --workspace` + direct `cargo publish` (Anchor 0.30.1's
+#   proc-macro2 IDL bug is bypassed entirely)
+# - npm publish --provenance enabled for Sigstore-signed attestation
+# - Path+version dual-decl on alea-sdk → alea-verifier dep means cargo
+#   strips path on publish automatically; no sed swap needed
+# - GitHub release attachments trimmed to CHANGELOG note only (on-chain
+#   .so is already committed at target/idl and can be reproduced by
+#   consumers via solana-verify build if needed)
+
+# Least-privilege top-level. Specific jobs grant more as needed.
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,13 +39,13 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.79.0"  # pinned to match solana-program 1.18.26 resolution via anchor 0.30.1
+          toolchain: "1.79.0"
 
       - name: Run workspace tests (lib + unit, no anchor build)
-        # Phase 4 CI fix: `anchor test` / `anchor build` hit Anchor 0.30.1 +
-        # proc-macro2 1.0.82+ IDL-generation bug. `cargo test --workspace`
-        # exercises every crate's unit + lib tests (69+ tests) without the
-        # anchor build step. Matches test.yml PR-CI pattern.
+        # Phase 4 CI fix: `anchor test` / `anchor build` hit Anchor 0.30.1
+        # + proc-macro2 1.0.82+ IDL-generation bug. `cargo test` exercises
+        # every crate's unit + lib tests (74+ tests) without the anchor
+        # build step. Matches test.yml PR-CI pattern.
         run: cargo test --workspace --lib --tests
 
       - name: Install Node.js
@@ -49,38 +66,25 @@ jobs:
           npm ci
           node --experimental-strip-types verify-fixtures.ts
 
-  release:
-    needs: [test]   # T1.13 — gate publish on passing tests; tag pushes cannot publish on test failure
+  publish:
+    needs: [test]   # gate publish on passing tests
     runs-on: ubuntu-latest
-    # Only the deployer / multisig cosigner can trigger (gated by tag push).
-    # CI runs on tag; humans still sign cargo/npm publishes via trusted tokens.
+    # `id-token: write` is required for npm provenance attestation signing
+    # via Sigstore (T2 hardening — signed attestation ties published
+    # tarball back to the exact commit + workflow run).
+    permissions:
+      contents: write   # to upload release assets
+      id-token: write   # for npm provenance Sigstore signing
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # NOTE (T2.32): coral-xyz/anchor-action does NOT exist (verified 2026-04-14
-      # via GitHub API — repo returns 404). Use manual solana-install + avm pattern.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          # Reads rust-toolchain.toml automatically — but rust-toolchain.toml
-          # channel is TBD until Phase 1.1.A. Hardcode here temporarily; swap
-          # to reading toolchain file once pinned.
-          toolchain: "1.79.0"  # TBD — update post Phase 1.1.A
-
-      - name: Install Solana CLI
-        run: |
-          sh -c "$(curl -sSfL https://release.solana.com/v2.2.0/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
-
-      - name: Install Anchor via AVM (pinned =0.30.1)
-        run: |
-          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          avm install 0.30.1
-          avm use 0.30.1
-          anchor --version | grep "0.30.1"
+          toolchain: "1.79.0"
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -88,55 +92,51 @@ jobs:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Build Anchor program (verifiable)
-        run: anchor build --verifiable
-
-      - name: Copy IDL to SDK (T2.05 — IDL bundling)
-        run: |
-          mkdir -p sdk/typescript/src/idl
-          cp target/idl/alea_verifier.json sdk/typescript/src/idl/alea_verifier.json
-          test -f sdk/typescript/src/idl/alea_verifier.json || { echo "IDL missing"; exit 1; }
-
-      - name: Build TypeScript SDK
+      - name: Build TypeScript SDK (generates IDL inline + compiles)
         working-directory: sdk/typescript
         run: |
-          npm install
+          npm ci
           npm run build
-          test -f dist/idl/alea_verifier.json || { echo "IDL not bundled in dist"; exit 1; }
+          # dist/idl/ is produced by the build step via prebuild; verify:
+          test -f dist/idl/alea_verifier.json || { echo "IDL bundle missing"; exit 1; }
 
       - name: Publish alea-verifier to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: |
-          # Publish order matters: alea-verifier first (the program crate),
-          # alea-sdk second (the CPI crate depending on alea-verifier).
-          cargo publish -p alea-verifier
+        # `cpi` feature implies `no-entrypoint`, giving library-mode
+        # publish (no BPF entrypoint in the tarball). Path deps on the
+        # workspace are stripped automatically by cargo publish.
+        run: cargo publish -p alea-verifier --no-default-features --features no-entrypoint
 
       - name: Wait for crates.io index propagation
+        # crates.io index CDN takes up to ~60s for a fresh publish to
+        # become resolvable by name + version. Without the wait, the
+        # next publish step errors with "no matching package".
         run: sleep 60
 
       - name: Publish alea-sdk to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        # alea-sdk's Cargo.toml has `path + version = "=0.1.0"` on the
+        # alea-verifier dep. Cargo strips `path` on publish, uses the
+        # version for the tarball — no manual swap dance needed.
         run: cargo publish -p alea-sdk
 
-      - name: Publish @alea/sdk to npm
+      - name: Publish @alea/sdk to npm (with provenance)
         working-directory: sdk/typescript
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm publish --access public
+        # --provenance produces a signed Sigstore attestation linking
+        # the tarball to this exact commit + workflow run. Consumers
+        # can verify via `npm audit signatures`.
+        run: npm publish --access public --provenance
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # T2.CC — `generate_release_notes: true` removed. We rely solely on
-          # body_path: CHANGELOG.md as the single source of release-note truth.
-          # Keeping both produced doubled release text (auto-generated bullet
-          # list followed by curated CHANGELOG content). CHANGELOG.md is the
-          # canonical changelog per ADR 0028 versioning policy; release notes
-          # mirror that, not GitHub's auto-summary.
+          # T2.CC — no auto-generated notes; CHANGELOG.md is canonical.
           body_path: CHANGELOG.md
-          files: |
-            target/verifiable/alea_verifier.so
-            target/idl/alea_verifier.json
+          # Binary attachments deferred — consumers reproduce the deployed
+          # on-chain program via `solana-verify build` against the tagged
+          # commit. See sdk/rust/README.md §Troubleshooting for the path
+          # if needed.

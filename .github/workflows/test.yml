@@ -23,9 +23,16 @@ name: Test
 
 on: [push, pull_request]
 
+# Phase 4.5 T2 — least-privilege workflow permissions. Read-only by default;
+# no job in this workflow needs to write anything.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 

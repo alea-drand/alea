@@ -42,6 +42,10 @@ on:
       - 'Cargo.lock'
       - 'Anchor.toml'
 
+# Phase 4.5 T2 — least-privilege top-level. Jobs below grant what they need.
+permissions:
+  contents: read
+
 jobs:
   idl-diff:
     runs-on: ubuntu-latest
