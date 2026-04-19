@@ -12,4 +12,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: cd sdk/typescript && npm ci && npm test
+      - name: Install dependencies
+        run: cd sdk/typescript && npm ci
+      - name: Build (tsc)
+        run: cd sdk/typescript && npm run build
+      - name: Copy IDL to dist
+        run: cd sdk/typescript && mkdir -p dist/idl && cp src/idl/* dist/idl/
+      - name: Test (vitest unit suite)
+        run: cd sdk/typescript && npm test
+      - name: Pack dry-run
+        run: cd sdk/typescript && npm pack --dry-run 2>&1 | tee /tmp/pack-output.txt
+      - name: Verify pack includes required files
+        run: |
+          PACK=$(cat /tmp/pack-output.txt)
+          for f in "dist/idl/alea_verifier.json" "src/idl/alea_verifier.json" "README.md" "CAVEATS.md" "LICENSE"; do
+            if echo "$PACK" | grep -q "$f"; then
+              echo "✓ $f"
+            else
+              echo "✗ MISSING: $f" && exit 1
+            fi
+          done
