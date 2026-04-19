@@ -13,12 +13,18 @@ Any Anchor program can receive cryptographically verified on-chain randomness wi
 ```toml
 [dependencies]
 alea-sdk = "0.1"
+
+# Required pin — without this, cargo check / cargo build-sbf fails on
+# rustc < 1.95 (current stable is 1.94, Solana BPF is 1.89-dev). See
+# Troubleshooting below for context. Re-check after every `cargo update`.
+constant_time_eq = "=0.4.2"
 ```
 
 or
 
-```
+```bash
 cargo add alea-sdk
+cargo add constant_time_eq@=0.4.2   # required transitive pin; see Troubleshooting
 ```
 
 ---
@@ -244,13 +250,16 @@ If you copy the Quick Start and paste a placeholder program ID like
 
 ```
 error: pubkey array is not 32 bytes long: len=N
-error: cannot find value `ID` in crate `crate`
+error[E0425]: cannot find value `ID` in crate `crate`
+  = help: consider importing this module: `anchor_lang::system_program::ID`
 ```
 
-That second error is misleading — it suggests the program ID import is
-broken, but the actual issue is that Anchor's `declare_id!` requires
-exactly a **44-character base58-encoded ed25519 pubkey** (32 bytes =
-44 base58 chars). Generate a real one with:
+**Ignore the rustc helper suggestion about `system_program::ID`.** It's a
+red herring — rustc can't see that the cascade is caused by the first
+error (a proc-macro panic inside `declare_id!`) and guesses at imports.
+The actual fix is: `declare_id!` requires exactly a **44-character
+base58-encoded ed25519 pubkey** (32 bytes = 44 base58 chars). Generate a
+real one with:
 
 ```bash
 solana-keygen new --outfile /tmp/my-program-id.json --no-bip39-passphrase --force
