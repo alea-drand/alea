@@ -4,28 +4,43 @@ on:
     paths: ['sdk/typescript/**']
   pull_request:
     paths: ['sdk/typescript/**']
+
+# Phase 4.5 T2 — least-privilege. Read-only.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - name: Install dependencies
-        run: cd sdk/typescript && npm ci
+        working-directory: sdk/typescript
+        run: npm ci
       - name: Build (tsc)
-        run: cd sdk/typescript && npm run build
-      - name: Copy IDL to dist
-        run: cd sdk/typescript && mkdir -p dist/idl && cp src/idl/* dist/idl/
+        # `prebuild` runs scripts/generate-idl-ts.mjs before tsc so the
+        # inlined IDL const exists. Post-tsc, dist/idl/ is populated too.
+        working-directory: sdk/typescript
+        run: npm run build
       - name: Test (vitest unit suite)
-        run: cd sdk/typescript && npm test
+        working-directory: sdk/typescript
+        run: npm test
       - name: Pack dry-run
-        run: cd sdk/typescript && npm pack --dry-run 2>&1 | tee /tmp/pack-output.txt
+        working-directory: sdk/typescript
+        run: npm pack --dry-run 2>&1 | tee /tmp/pack-output.txt
       - name: Verify pack includes required files
+        # Phase 4.5: IDL is inlined as src/idl.ts → compiled to dist/idl.js.
+        # src/idl/** is no longer in `files` (T2-09 dedup). The bundled
+        # JSON path under dist/idl/ is still produced by tsc for the JSON
+        # loader fallback.
         run: |
           PACK=$(cat /tmp/pack-output.txt)
-          for f in "dist/idl/alea_verifier.json" "src/idl/alea_verifier.json" "README.md" "CAVEATS.md" "LICENSE"; do
+          for f in "dist/idl.js" "dist/idl.d.ts" "README.md" "CAVEATS.md" "LICENSE"; do
             if echo "$PACK" | grep -q "$f"; then
               echo "✓ $f"
             else
