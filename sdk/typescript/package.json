@@ -66,7 +66,7 @@
   },
   "devDependencies": {
     "typescript": "^5.4",
-    "vitest": "^2.1",
+    "vitest": "^4.1",
     "@types/node": "^20",
     "@solana/web3.js": "^1.95.0",
     "@coral-xyz/anchor": "^0.30.1"
