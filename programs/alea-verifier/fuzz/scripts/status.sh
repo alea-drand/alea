@@ -11,7 +11,8 @@
 
 set -euo pipefail
 
-FUZZ_DIR="/Users/aaron/dev/work/alea/programs/alea-verifier/fuzz"
+# Resolve fuzz dir relative to this script's location (portable).
+FUZZ_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOGS="$FUZZ_DIR/run-logs"
 CORPUS_ROOT="$FUZZ_DIR/corpus"
 ARTIFACTS_ROOT="$FUZZ_DIR/artifacts"

@@ -104,8 +104,7 @@ mod tests {
     fn hash_round_to_g1_uses_big_endian_round_bytes() {
         // Round 1 u64 big-endian = 00 00 00 00 00 00 00 01
         // keccak256 of that = 6c31fc15422ebad28aaf9089c306702f67540b53c7eea8b7d2941044b027100f
-        // This value is committed as msg_hash_keccak256_hex in
-        // build-spec/testing/fixtures/round-1.json (gnark-verified).
+        // Cross-verified against gnark-crypto's hash-to-curve implementation.
         let round_bytes = 1u64.to_be_bytes();
         assert_eq!(
             round_bytes,

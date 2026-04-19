@@ -51,7 +51,7 @@ import aleaIdl from "../target/idl/alea_verifier.json";
 // the on-chain initialize handler to reject with AleaError codes 6007 /
 // 6008 / 6010 / 6011 (T2.E byte-equality guards).
 //
-// Source: `build-spec/testing/fixtures/chain-info.json` (v2 drand evmnet).
+// Source: drand evmnet chain info (public, v2 scheme — see https://api.drand.sh/chains).
 // ---------------------------------------------------------------------------
 
 const EVMNET_PUBKEY = Buffer.from(

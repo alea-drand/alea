@@ -4,8 +4,9 @@ use anchor_lang::prelude::*;
 /// and are part of the v1 CPI interface per ADR 0028 — never renumber,
 /// never remove (reserved even if unreachable, see NoSquareRoot).
 ///
-/// Canonical source: `build-spec/program/spec.md §"Error Codes"`.
-/// Consumer SDKs (TS `@alea-drand/sdk` and Rust `alea-sdk`) map these 1:1.
+/// See the "Error Codes" table in the main repository README for the
+/// canonical consumer-facing description of each code. Consumer SDKs
+/// (TS `@alea-drand/sdk` and Rust `alea-sdk`) map these 1:1.
 ///
 /// # Anchor framework error codes to be aware of (not Alea-custom)
 ///
