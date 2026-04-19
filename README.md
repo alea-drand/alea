@@ -55,8 +55,11 @@ This is not a VRF service in the ORAO/Switchboard sense (per-request oracle). It
 |-----------------|---------------|----------|------------|-------------|
 | [ORAO VRF](https://orao.network) | ~$0.15 | Request-then-callback (2 tx) | Single-operator attestation | Trust the operator |
 | [Switchboard](https://switchboard.xyz) randomness | ~$0.01+ | Oracle round trip | Oracle committee attestation | Trust the committee |
+| [MagicBlock VRF](https://docs.magicblock.gg) | Not publicly disclosed | Request-then-callback (2 tx) | Program-signed callback | Trust the VRF operator |
 | Commit-reveal (DIY) | 0 | 2 tx + coordinator logic | No cryptographic provenance | Trust your own coordinator |
-| **Alea** | **$0** (~0.000005 SOL tx fee) | **1 CPI call, single tx** | **drand threshold sig (BN254 BLS)** | **Trust drand's League-of-Entropy threshold** |
+| **Alea** | **$0** (~0.000005 SOL tx fee) | **1 CPI call, single tx** | **drand threshold sig, verified on-chain via BN254 BLS** | **Trust drand's League-of-Entropy threshold** |
+
+**What makes Alea different:** the other options on this row are oracle-based — a designated operator or committee produces the randomness and attests to it. Consumers trust that attestation. Alea has no operator: the randomness is the drand beacon itself, and Solana verifies the BN254 pairing on-chain before returning the bytes. The trust surface is drand's threshold-signer set, not an intermediate oracle.
 
 **Alea trades off**: you can't get per-caller unique randomness without consumer-side derivation (see [FAQ](#faq)). For public-draw semantics, that's not a trade-off — it's a feature. Multiple consumers watching the same round arrive at the same bytes independently, which means the "fair draw" is auditable by anyone.
 
@@ -381,10 +384,17 @@ Canonical source: [`programs/alea-verifier/src/errors.rs`](programs/alea-verifie
 
 Alea was developed with a self-imposed multi-pass adversarial-review discipline before the v0.1.0 devnet publish:
 
-- **Specification audits** — several rounds of cold-read persona review against the full build specification (independent adversarial readers on each round), with all Tier-1 findings resolved before implementation started. One round caught a G2 generator coordinate mislabelling that would have silently failed.
-- **Fuzzing** — three parallel cargo-fuzz targets (field arithmetic, SVDW hash-to-curve, and the pairing pipeline) ran for a combined **23.82 billion iterations with 0 crashes and 0 memory errors**. Proof tarballs are attached to the [`v0.2.0-audit-passed`](https://github.com/alea-drand/alea/releases/tag/v0.2.0-audit-passed) GitHub release.
-- **Pre-publish Phase 4.5 audit (2026-04-19)** — 12 cold-read agents (8 consumer-persona reviewers + 4 adversarial red-team agents probing API fuzzing, drand-endpoint hostility, replay/griefing, and cryptographic edge cases) found **zero exploitable crypto or replay vulnerabilities**. 16 Tier-1 and ~28 Tier-2 publish-quality items were resolved before v0.1.0 shipped. Findings are public under [`audit/phase-4.5/`](audit/phase-4.5/).
-- **Pre-publish integration audit** — four clean-room integration agents (two first-run, two re-verify after fixes) scored the published SDK shape 8.3/10 (Rust) and 7.8/10 (TypeScript) — unanimous publish-ready verdict.
+- **Specification audits** — multiple rounds of cold-read review against the full build specification before implementation started. All Tier-1 findings resolved at the spec level; one round caught a G2 generator coordinate mislabelling that would have silently failed.
+- **Fuzzing** — **5 parallel cargo-fuzz targets** covering the full cryptographic pipeline:
+  - `verify_beacon` — end-to-end verify (round + signature → randomness)
+  - `hash_to_g1` — full SVDW hash-to-curve
+  - `on_curve_g1` — G1 on-curve validation
+  - `hash_to_field_canonicity` — Fq field-element canonicity
+  - `pairing_buffer_parses` — pairing input deserialization
+
+  Final campaign (2026-04-18): **22.05 billion iterations across all 5 targets in 13 hours wall time with 0 crashes, 0 memory errors, 0 timeouts** (libFuzzer `-fork=3` per target on 18-core hardware). An earlier Stage 5b corpus-seeded pilot added 1.77 billion iterations across the 3 original targets, bringing the combined total to **23.82 billion iterations**. Proof tarballs (per-target coverage HTML + metadata + SHA256 sums) are attached to the [`v0.2.0-audit-passed`](https://github.com/alea-drand/alea/releases/tag/v0.2.0-audit-passed) GitHub release.
+- **Pre-publish Phase 4.5 review (2026-04-19)** — adversarial cold-read probing the SDK surfaces for API-fuzzing gaps, drand-endpoint hostility, replay/griefing, and cryptographic edge cases. Found **zero exploitable crypto or replay vulnerabilities**. 16 Tier-1 + ~28 Tier-2 publish-quality items were resolved before v0.1.0 shipped. Findings public under [`audit/phase-4.5/`](audit/phase-4.5/).
+- **Pre-publish integration verification** — clean-room consumer integration passes (Rust + TypeScript) scored the published SDK shape at 8.3/10 and 7.8/10 respectively with unanimous publish-ready verdicts.
 - **External paid audit** — not yet performed. Required before the Phase 5 mainnet deploy.
 
 Evidence:
