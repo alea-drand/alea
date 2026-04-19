@@ -1,0 +1,73 @@
+# Dependabot config — automated dependency update PRs.
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+
+updates:
+  # Rust workspace dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "rust"
+    # Group non-semver-breaking updates into one PR to reduce review load
+    groups:
+      arkworks:
+        patterns:
+          - "ark-*"
+      solana:
+        patterns:
+          - "solana-*"
+      anchor:
+        patterns:
+          - "anchor-*"
+          - "@coral-xyz/*"
+    # Anchor is exact-pinned (=0.30.1) via workspace — do not auto-bump
+    ignore:
+      - dependency-name: "anchor-lang"
+        versions: ["0.31.*", "0.32.*", "1.*"]
+
+  # TypeScript SDK
+  - package-ecosystem: "npm"
+    directory: "/sdk/typescript"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "typescript"
+    groups:
+      solana:
+        patterns:
+          - "@solana/*"
+      anchor:
+        patterns:
+          - "@coral-xyz/*"
+    # Hold major web3.js / anchor bumps for manual review given ADR 0028 freeze
+    ignore:
+      - dependency-name: "@solana/web3.js"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@coral-xyz/anchor"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions pinning
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"

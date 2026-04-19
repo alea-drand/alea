@@ -2,7 +2,7 @@
 
 All notable changes to Alea (on-chain drand BN254 verifier for Solana) are documented in this file.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Interface stability guarantees for the `verify` instruction are frozen at v1 per [ADR 0028](build-spec/decisions/0028-cpi-versioning.md).
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Interface stability guarantees for the `verify` instruction are frozen at v1 — see the Versioning Policy section at the bottom of this file.
 
 ## [Unreleased]
 
@@ -67,7 +67,7 @@ Initial release. Solana devnet only; mainnet deployment is the Phase 5 gate.
 ### Known Limitations
 
 - Devnet only. Mainnet pending Phase 5.
-- v1 single deployer keypair is a single point of failure until the multisig transition (see [ADR 0009](build-spec/decisions/0009-upgrade-authority.md)).
+- v1 single deployer keypair is a single point of failure until the multisig transition (see README.md §Governance for the roadmap).
 - CU budget: Alea verify consumes up to ~454K CU; every tx MUST include `ComputeBudgetInstruction::set_compute_unit_limit(900_000)`. The TS SDK injects this automatically; Rust consumers must add it manually.
 - Supports drand `evmnet` chain only. mainnet / quicknet (BLS12-381) would require a separate deployment.
 - BPF 6006 `PairingError` None-arm runtime test is open (infrastructure-failure path, not attacker-reachable; Phase 5 acceptance item).

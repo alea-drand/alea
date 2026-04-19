@@ -10,7 +10,7 @@ Include: a description of the vulnerability, reproduction steps, impact assessme
 
 ## Response Intent
 
-Alea is solo-maintained until the Squads 2-of-3 multisig transition per [ADR 0009](https://github.com/alea-drand/alea/blob/main/build-spec/decisions/0009-upgrade-authority.md) (trigger: 90 days post-mainnet, $50K TVL, or first audit — whichever fires first).
+Alea is solo-maintained until the Squads 2-of-3 multisig transition (trigger: 90 days post-mainnet, $50K TVL, or first external audit — whichever fires first). See [README.md §Governance](https://github.com/alea-drand/alea#governance--upgrade-roadmap) for the full roadmap.
 
 **Pre-transition:** best-effort response within a few days for P0 issues. If the maintainer is unreachable, the Apache 2.0 license permits forks under a new program ID; fork migration instructions would be published in CHANGELOG.md and the upstream security advisory.
 
