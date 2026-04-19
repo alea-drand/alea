@@ -3,7 +3,29 @@
   "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "TypeScript SDK for Alea — drand BN254 randomness verification on Solana",
-  "repository": "https://github.com/alea-drand/alea",
+  "homepage": "https://alea.so",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alea-drand/alea.git",
+    "directory": "sdk/typescript"
+  },
+  "bugs": {
+    "url": "https://github.com/alea-drand/alea/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "solana",
+    "drand",
+    "randomness",
+    "verifiable-randomness",
+    "vrf",
+    "bls",
+    "bn254",
+    "cryptography",
+    "web3"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
