@@ -248,3 +248,89 @@ All three branches of the verify pipeline reject as specified on real network.
 4. Config PDA exists, 217 B, all 6 fields byte-match hardcoded constants ✓
 5. `config.authority` = deployer ✓
 6. Upgrade path proven via Phase D-bis fire drill ✓
+
+---
+
+# Phase 4 — Full SDK + Publish-Ready (Build + Dry-Run + Test) — 2026-04-19
+
+Phase 4 extends the minimal Phase 3 SDK scaffold to the full v1 API surface
+per `build-spec/sdk/rust-cpi.md` and `build-spec/sdk/typescript.md`, builds
+the canonical `example-lottery` consumer program, and prepares all three
+packages for crates.io + npm publication via dry-run. Actual publish triggers
+are deferred to a follow-up session (plan decision).
+
+## Packages
+
+| Name | Registry | Availability | Status |
+|---|---|---|---|
+| `alea-verifier` | crates.io | available (verified 2026-04-19) | dry-run passes |
+| `alea-sdk` | crates.io | available (verified 2026-04-19) | dry-run passes (modulo expected "alea-verifier not yet published" — swap mechanism validated) |
+| `@alea/sdk` | npm | scope available (0 packages under @alea) | dry-run passes; 34 files, 20.2 kB tarball |
+
+## Acceptance gate (from plan)
+
+- [x] Rust SDK v1 surface: `cpi::verify`, `AleaVerify<'info>`, `AleaVerifier`, re-exports — all present, `cargo test -p alea-sdk --tests` green (8 unit tests)
+- [x] TS SDK ESM build: `tsc` emits `dist/` with ESM + `.d.ts`; 35 vitest unit tests green
+- [x] `example-lottery` BPF compiles (190 KB .so), Anchor tests defined (gated `ANCHOR_DEVNET=1`)
+- [x] `cargo publish --dry-run -p alea-verifier --features no-entrypoint` → success
+- [x] `cargo publish --dry-run -p alea-sdk` (path-dep→version-dep swap) → expected-fail on registry lookup (confirms swap mechanism; actual publish needs `alea-verifier` pushed first)
+- [x] `npm publish --dry-run --access public` → success (includes `dist/idl/alea_verifier.json`, `src/idl/alea_verifier.json`, README, CAVEATS, LICENSE)
+- [x] Pre-publish secret scan clean (0 hits)
+- [x] Both READMEs cite mandatory consumer constraints + prominent CAVEATS link
+- [x] Both CAVEATS.md files enumerate 6 maturity-curve disclosures w/ Phase-N resolution notes
+- [x] `example-lottery` persona-audited via `superpowers:code-reviewer` — 2 T1 findings fixed (zero-amount guard, player Signer)
+- [x] Tier 3 consumer smoke: fresh external Rust program BPF-compiles with `alea-sdk` path-dep; fresh external Node project `import`s `@alea/sdk` and reads DEVNET_PROGRAM_ID
+
+## Devnet integration evidence
+
+**Rust (`cargo test -p alea-sdk --test devnet_verify -- --ignored`):**
+```
+running 3 tests
+[devnet_verify] wrong_round_fails_with_6000 ok: code=6000 tx=2fPYXTJ2u9Nk2okAg1Fti6smckoMvrDfaqW3AJwpEj2TpoiYvsnfQenpfbjNR5vGewQTKa9EtB91TijeCtqLMxk6
+test wrong_round_fails_with_6000 ... ok
+[devnet_verify] round 1 ok: tx=3dQNPZA3yLuSYihyQ9RcsXrkQ1yrcyZSe5He6L3ynjoiscaT1RReoVbm9DQpVrLpUwSb6URfopUbevyv4V8zm4wH randomness=0x781b75698adc3af62cfa55db83cf0c73ae54e1ac8c0d4c3a2224126b65369ec5
+test verify_round_1_fixture_against_devnet ... ok
+[devnet_verify] round 9337227 ok: tx=iKTiUm8mAXc6W4UNESrBRCFKqsQZ1k98wYMbt5ZB5HVn4qv3mtxA8p2q1Szsis61CU2BkLFYhVNRe4SFKcQ1q3C randomness=0xa1e645cd6193837f626716851f5c42ad4bf63ad75193b2cae40f88c08c8f3bd8
+test verify_round_9337227_fixture ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.55s
+```
+
+**TypeScript (`ALEA_DEVNET_TESTS=1 npm run test:devnet`):**
+```
+✓ tests/devnet_integration.test.ts  (3 tests) 2366ms
+Test Files  1 passed (1)
+     Tests  3 passed (3)
+```
+- round-1: randomness matches expected
+- round-9337227: randomness matches expected
+- wrong-round: throws `AleaError` with `.code === 6000` cleanly extracted
+
+## Phase 4 learnings (new vault entries)
+
+- **Anchor 0.30.1 + `@solana/web3.js` ≥ 1.98 incompat** — Anchor's `AnchorProvider.sendAndConfirm` (provider.ts:186) calls `new SendTransactionError(err.message, logs)` (old positional signature), but web3.js 1.98 changed to object destructuring `{action, signature, transactionMessage, logs}`. Result: all error-code information destroyed, thrown as `Error("Unknown action 'undefined'")`. **Fix applied in client.ts:** bypass `.rpc()`, use `.transaction()` → sign → `connection.sendRawTransaction` → read errors from `getTransaction().meta.err + meta.logMessages` directly. More portable, version-independent.
+- **JSON import assertion syntax fragmentation** — `assert { type: "json" }` deprecated in Node 21+ (removed in Node 22+); `with { type: "json" }` added in Node 20.10+. No single syntax works on Node 18 LTS → 25. **Fix applied:** load IDL via `readFileSync` + `JSON.parse`. Portable across all Node ESM versions + all bundlers.
+- **External Rust consumers hit Solana BPF rustc lag** — fresh `cargo build-sbf` against a `constant_time_eq 0.4.3` transitive dep fails because Solana's embedded rustc is 1.89-dev while the crate requires 1.95. Workaround: pin `constant_time_eq = 0.4.2` in consumer Cargo.toml. Worth documenting in README.
+
+## Publish dry-run tarball SHAs
+
+- `alea-verifier v0.1.0` (cargo): verified via `cargo publish --dry-run --no-default-features --features no-entrypoint`. "Uploading alea-verifier v0.1.0 … warning: aborting upload due to dry run" → success.
+- `alea-sdk v0.1.0` (cargo): path-dep→version-dep swap mechanism validated; real publish blocked on `alea-verifier@0.1` not existing on crates.io until the first real publish completes.
+- `@alea/sdk@0.1.0` (npm): tarball shasum `4520604418fdf5fdcf8cda1ee5e04a9b4eee6eae`, 34 files, 19.4 kB packed / 72.9 kB unpacked, includes `dist/idl/alea_verifier.json` + `src/idl/alea_verifier.json` + README + CAVEATS + LICENSE.
+
+## Follow-up (deferred to next session)
+
+- Aaron creates `@alea` npm org at npmjs.com/org/create (free, pre-req for real publish)
+- Aaron generates crates.io API token + npm publish-only access token, stores in 1Password
+- In a follow-up session: `cargo publish -p alea-verifier --features no-entrypoint` → wait ~30s index → swap path-dep → `cargo publish -p alea-sdk` → revert swap → `cd sdk/typescript && npm publish --access public`
+- Tag release `v0.3.0-sdk` on main, push tag for GitHub release
+- Verify installability from clean env
+
+## Remaining Phase 5 gates (tracked, not Phase 4 work)
+
+- POST-T2.04 BPF 6006 None-arm runtime integration test
+- Squads 2-of-3 multisig transition per ADR 0009
+- External paid audit firm review
+- Vanity program ID revisit for mainnet
+- Mail server for `security@alea.so` inbound
+- `@alea/palestra-sdk` (Phase 7) + Docusaurus docs site (Phase 6) + Randamu outreach (manual)
