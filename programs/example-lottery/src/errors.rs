@@ -18,4 +18,16 @@ pub enum GameError {
     /// that the player cannot have observed at commit time.
     #[msg("min_resolution_round must be a future drand round (anti-front-run)")]
     MinRoundInPast,
+
+    /// Bet PDA lamport balance is insufficient to pay out — indicates either
+    /// a griefing attempt (someone drained funds outside the normal flow) or
+    /// a state-corruption bug. Hard-fail with checked arithmetic.
+    #[msg("Bet PDA lamport balance is insufficient to pay out")]
+    InsufficientFunds,
+
+    /// Arithmetic overflow when crediting the payout destination. Vanishingly
+    /// unlikely (would require the house/player wallet to hold ~u64::MAX
+    /// lamports already) but checked to be defensive.
+    #[msg("Payout overflow")]
+    PayoutOverflow,
 }

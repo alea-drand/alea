@@ -37,11 +37,23 @@ describe("isRoundRecent", () => {
     expect(isRoundRecent(0n, config, clock, 60n)).toBe(false);
   });
 
-  it("returns false for future round (clock behind round timestamp)", () => {
+  // Aligned 2026-04-19 (phase 4.5 ADR A1): future rounds treated as 'recent'
+  // matching Rust saturating_sub behavior. Consumer verifying at round edge
+  // won't spuriously fail due to sub-second clock skew; on-chain verify will
+  // see the same round valid a moment later.
+  it("returns true for future round (clock behind round timestamp) — matches Rust", () => {
     const round = 100n;
     const roundTs = config.genesisTime + (round - 1n) * config.period;
     const clock = { unixTimestamp: roundTs - 1n };
-    expect(isRoundRecent(round, config, clock, 60n)).toBe(false);
+    expect(isRoundRecent(round, config, clock, 60n)).toBe(true);
+  });
+
+  it("returns true for far-future round (still within max-age semantics)", () => {
+    const round = 100n;
+    const roundTs = config.genesisTime + (round - 1n) * config.period;
+    // clock 1000s behind the round (deep future) — still 'recent'
+    const clock = { unixTimestamp: roundTs - 1000n };
+    expect(isRoundRecent(round, config, clock, 30n)).toBe(true);
   });
 
   it("zero-age window: only exact match is recent", () => {
