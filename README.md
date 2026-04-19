@@ -1,6 +1,6 @@
 # Alea
 
-> **The die is cast.** On-chain [drand](https://drand.love) BN254 verifier for Solana. Apache 2.0, free public good.
+On-chain [drand](https://drand.love) BN254 verifier for Solana. Apache 2.0, free public good.
 
 [![CI](https://github.com/alea-drand/alea/actions/workflows/test.yml/badge.svg)](https://github.com/alea-drand/alea/actions/workflows/test.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -8,7 +8,7 @@
 [![npm](https://img.shields.io/npm/v/@alea-drand/sdk.svg)](https://www.npmjs.com/package/@alea-drand/sdk)
 [![drand](https://img.shields.io/badge/powered%20by-drand-ff6b6b.svg)](https://drand.love)
 
-Alea is an on-chain drand BN254 verifier for Solana. Any Solana program can call `alea_sdk::cpi::verify(program, config, payer, round, signature)` and get 32 bytes of cryptographically verified randomness in a single transaction — no callbacks, no keepers, no off-chain coordinators, no tokens, no protocol fees.
+Any Solana program can call `alea_sdk::cpi::verify(program, config, payer, round, signature)` and get 32 bytes of cryptographically verified randomness in a single transaction — no callbacks, no keepers, no off-chain coordinators, no protocol fees.
 
 ---
 
@@ -26,7 +26,7 @@ Alea is an on-chain drand BN254 verifier for Solana. Any Solana program can call
 - [Program Addresses](#program-addresses)
 - [Error Codes](#error-codes)
 - [Security](#security)
-- [Audit Trail](#audit-trail)
+- [Testing & Validation](#testing--validation)
 - [Governance & Roadmap](#governance--upgrade-roadmap)
 - [Testing on Devnet](#testing-on-devnet)
 - [FAQ](#faq)
@@ -82,17 +82,16 @@ Read [CHANGELOG.md](CHANGELOG.md) for release notes and [`sdk/rust/CAVEATS.md`](
 
 ## Use Cases
 
-**Good fit (Alea excels):**
-- 🎲 **Lotteries and raffles** where everyone sees the same draw
-- 🏆 **Tournament brackets** and seeding (public, auditable)
-- 🎰 **On-chain games** with public-draw semantics (slots, dice, card games with open outcomes)
-- 🚀 **Fair launch / mint order** randomization
-- 🗳️ **Governance sortition** (picking N delegates from M candidates)
-- 🎨 **NFT trait reveal** with provable fairness
-- 📅 **Daily winners / drops** that need public proof of randomness
+**Good fit:**
+- Lotteries and raffles where everyone sees the same draw
+- Tournament brackets and seeding (public, auditable)
+- On-chain games with public-draw semantics (slots, dice, card games with open outcomes)
+- Fair launch and mint-order randomization
+- Governance sortition (picking N delegates from M candidates)
+- NFT trait reveal with provable fairness
 
-**Needs consumer-side derivation (documented pattern, see [FAQ](#faq)):**
-- Per-user unique randomness (derive `per_user = sha256(round_randomness || user_pubkey)`)
+**Needs consumer-side derivation** (see [FAQ](#faq) for the `per_user = sha256(round_randomness || user_pubkey)` pattern):
+- Per-user unique randomness
 - Private-bid auctions (commit-reveal + Alea as the reveal trigger)
 
 **Not a fit:**
@@ -210,7 +209,7 @@ Alea verify consumes **up to ~454K CU** worst-case. Solana's default per-instruc
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  drand League of Entropy (23 orgs, threshold signed, 3s period) │
+│  drand League of Entropy (threshold signed, 3s period)          │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             │ fetchBeacon() — 5 endpoints with fallback
@@ -380,27 +379,27 @@ Canonical source: [`programs/alea-verifier/src/errors.rs`](programs/alea-verifie
 
 ---
 
-## Audit Trail
+## Testing & Validation
 
-Alea was developed with a self-imposed multi-pass adversarial-review discipline before the v0.1.0 devnet publish:
+**Unit + integration tests:** 70+ Rust unit/integration tests covering SVDW hash-to-curve, G1/G2 on-curve checks, pairing verification, `is_round_recent` boundary cases, and PDA derivation. 37+ TypeScript unit tests covering the drand client, instruction builder, error extraction, and input validation. Full suite runs in CI on every PR.
 
-- **Specification audits** — multiple rounds of cold-read review against the full build specification before implementation started. All Tier-1 findings resolved at the spec level; one round caught a G2 generator coordinate mislabelling that would have silently failed.
-- **Fuzzing** — **5 parallel cargo-fuzz targets** covering the full cryptographic pipeline:
-  - `verify_beacon` — end-to-end verify (round + signature → randomness)
-  - `hash_to_g1` — full SVDW hash-to-curve
-  - `on_curve_g1` — G1 on-curve validation
-  - `hash_to_field_canonicity` — Fq field-element canonicity
-  - `pairing_buffer_parses` — pairing input deserialization
+**Live devnet integration:** end-to-end verification against live drand rounds on devnet (`cargo test -- --ignored` gates these behind explicit opt-in). Fixture-based regressions on canonical round-1 + round-9337227 beacons.
 
-  Final campaign (2026-04-18): **22.05 billion iterations across all 5 targets in 13 hours wall time with 0 crashes, 0 memory errors, 0 timeouts** (libFuzzer `-fork=3` per target on 18-core hardware). An earlier Stage 5b corpus-seeded pilot added 1.77 billion iterations across the 3 original targets, bringing the combined total to **23.82 billion iterations**. Proof tarballs (per-target coverage HTML + metadata + SHA256 sums) are attached to the [`v0.2.0-audit-passed`](https://github.com/alea-drand/alea/releases/tag/v0.2.0-audit-passed) GitHub release.
-- **Pre-publish Phase 4.5 review (2026-04-19)** — adversarial cold-read probing the SDK surfaces for API-fuzzing gaps, drand-endpoint hostility, replay/griefing, and cryptographic edge cases. Found **zero exploitable crypto or replay vulnerabilities**. 16 Tier-1 + ~28 Tier-2 publish-quality items were resolved before v0.1.0 shipped. Findings public under [`audit/phase-4.5/`](audit/phase-4.5/).
-- **Pre-publish integration verification** — clean-room consumer integration passes (Rust + TypeScript) scored the published SDK shape at 8.3/10 and 7.8/10 respectively with unanimous publish-ready verdicts.
-- **External paid audit** — not yet performed. Required before the Phase 5 mainnet deploy.
+**Fuzzing** — 5 parallel cargo-fuzz targets covering the full cryptographic pipeline:
 
-Evidence:
-- [`audit/phase-4.5/FINDINGS-CONSOLIDATED.md`](audit/phase-4.5/FINDINGS-CONSOLIDATED.md) — Phase 4.5 tier breakdown
-- [`audit/phase-4.5/THREAT-MODEL.md`](audit/phase-4.5/THREAT-MODEL.md) — trusted-vs-untrusted surface enumeration
-- [`validation-report.md`](validation-report.md) — validation history across phases
+| Target | Coverage |
+|--------|----------|
+| `verify_beacon` | end-to-end verify (round + signature → randomness) |
+| `hash_to_g1` | full SVDW hash-to-curve |
+| `on_curve_g1` | G1 on-curve validation |
+| `hash_to_field_canonicity` | Fq field-element canonicity |
+| `pairing_buffer_parses` | pairing input deserialization |
+
+Final campaign (April 2026): **22.05 billion iterations across all 5 targets in 13 hours wall time with 0 crashes, 0 memory errors, 0 timeouts** (libFuzzer `-fork=3` per target on 18-core hardware). An earlier corpus-seeded pilot added 1.77 billion iterations across the three original targets — combined total **23.82 billion iterations**. Proof tarballs (per-target coverage HTML + metadata + SHA256 sums) are attached to the [`v0.2.0-audit-passed`](https://github.com/alea-drand/alea/releases/tag/v0.2.0-audit-passed) GitHub release.
+
+**Supply chain:** `cargo-deny` (licenses + advisories + bans + sources) + `npm audit` + `trufflehog` secret-scan run on every PR and weekly cron.
+
+**External paid security audit** — not yet performed. Required before the Phase 5 mainnet deploy.
 
 ---
 
@@ -414,7 +413,7 @@ Alea is stateless: the on-chain program holds no user funds (no TVL). The upgrad
 | v2 | Squads 2-of-3 multisig | Within 90 days of mainnet deploy, or at the first external paid audit (whichever first) | Pending Phase 5 |
 | v3 | Immutable (authority zeroed) | After external audit clears and the program operates without critical bugs for a meaningful period on mainnet | Planned |
 
-The v2 multisig transition is a public commitment. The co-signers will be named at Phase 5.
+Co-signers for the multisig will be named when Phase 5 completes.
 
 **Interface stability guarantee**: the `verify` instruction signature, `Config` account layout, `Verify` accounts struct, return-data format, and `BeaconVerified` event schema are **frozen forever** for the mainnet program ID. Additive-only changes are welcome at minor versions; breaking changes require a new program ID (new deployment, not an upgrade). CI enforces this via the `idl-diff` check on every PR.
 
@@ -458,7 +457,7 @@ Chain-native sources are grindable or biased by the proposer. drand is threshold
 drand supports multiple curves; their `evmnet` chain uses BN254 specifically so Ethereum + Solana (both of which expose BN254 via precompiles/syscalls) can verify cheaply. The `alt_bn128_pairing` syscall is Alea's critical dependency.
 
 **What happens if drand gets compromised?**
-The drand threshold signature requires t+1 cooperating signers (where t < N/2). Compromise of a minority of members doesn't forge beacons. If the network is catastrophically compromised, Alea's verification rejects invalid signatures (error 6000) — you get a failed transaction, not silent corruption. Worst realistic case: service denial, not randomness compromise.
+drand is threshold-signed: forging a beacon requires compromising more than half the signer set. Compromise of a minority of signers doesn't forge anything. In the catastrophic case where a valid-looking forged beacon does get produced, Alea's verification still rejects anything that fails the pairing check (error 6000) — consumers see a failed transaction, not silent corruption.
 
 **What about front-running?**
 drand beacons are public the moment they're published. To prevent front-running in a commit-reveal pattern, consumers enforce `min_resolution_round ≥ current_round + 1` at commit time — the canonical [`example-lottery`](programs/example-lottery/) demonstrates this.
@@ -470,7 +469,7 @@ Not yet. The program is deployed only to devnet as of v0.1.0. Mainnet deployment
 Zero protocol fees. Zero oracle fees. You pay Solana's base transaction fee (~5000 lamports = $0.0005 at SOL=$100) plus the compute budget cost (~0.00005 SOL at 900K CU with default priority). No recurring subscription.
 
 **Is Alea production-ready?**
-For devnet integration testing: yes. For mainnet production: no (pending Phase 5 external audit). The audit trail is extensive and public (see [Audit Trail](#audit-trail)), but an external firm sign-off is the canonical gate.
+For devnet integration testing: yes. For mainnet production: not yet — an external paid security audit is the canonical gate (see [Status](#status) for the full Phase 5 checklist). The testing evidence shipped with the repo is under [Testing & Validation](#testing--validation).
 
 ---
 
@@ -497,7 +496,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding conventions
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for third-party attributions.
-
----
-
-*"alea iacta est" — Julius Caesar at the Rubicon, 49 BC. [Alea](https://en.wikipedia.org/wiki/Alea_iacta_est) = Latin for "die" (the plural is "aleae"). The die is cast, the randomness is on-chain.*
