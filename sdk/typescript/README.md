@@ -1,4 +1,4 @@
-# @alea/sdk
+# @alea-drand/sdk
 
 Verified drand randomness on Solana in one call.
 
@@ -7,7 +7,7 @@ Verified drand randomness on Solana in one call.
 ## Install
 
 ```bash
-npm install @alea/sdk @solana/web3.js @coral-xyz/anchor
+npm install @alea-drand/sdk @solana/web3.js @coral-xyz/anchor
 ```
 
 `@solana/web3.js` and `@coral-xyz/anchor` are **peer dependencies** — consumers install them directly so your bundle has one copy of each (prevents class-identity issues with `PublicKey` instances across mismatched versions).
@@ -17,7 +17,7 @@ Requires **Node 18+** and **ESM**. This package is ESM-only; use `import`, not `
 ## Quick Start — Browser (user pays, via wallet-adapter)
 
 ```typescript
-import { getVerifiedRandomness } from "@alea/sdk";
+import { getVerifiedRandomness } from "@alea-drand/sdk";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 
@@ -41,7 +41,7 @@ function RandomnessButton() {
 ## Quick Start — Server (developer pays, via Keypair)
 
 ```typescript
-import { getVerifiedRandomness } from "@alea/sdk";
+import { getVerifiedRandomness } from "@alea-drand/sdk";
 import { Keypair, Connection } from "@solana/web3.js";
 import { readFileSync } from "node:fs";
 
@@ -63,7 +63,7 @@ Before integrating into prod, run the SDK against live devnet:
 
 ```bash
 # 1. Install the SDK
-npm install @alea/sdk @solana/web3.js @coral-xyz/anchor
+npm install @alea-drand/sdk @solana/web3.js @coral-xyz/anchor
 
 # 2. Generate or load a Solana devnet keypair
 solana-keygen new --outfile ~/.config/solana/alea-test.json
@@ -218,7 +218,7 @@ This SDK is for off-chain consumers. If you're building an on-chain program that
 
 ## Zero Telemetry
 
-`@alea/sdk` sends **no analytics, no telemetry, no phone-home**. Your only network calls are:
+`@alea-drand/sdk` sends **no analytics, no telemetry, no phone-home**. Your only network calls are:
 - Drand API endpoints (for beacon fetch, 5 URLs with fallback — fully replaceable via `DRAND_ENDPOINTS` override)
 - Solana RPC endpoint of your choice (passed in as `connection`)
 
@@ -232,7 +232,7 @@ Every release carries an [npm provenance attestation](https://docs.npmjs.com/gen
 npm audit signatures
 ```
 
-Or visit [`@alea/sdk` on npm](https://www.npmjs.com/package/@alea/sdk) and look for the green "Provenance" badge. No badge → do not install.
+Or visit [`@alea-drand/sdk` on npm](https://www.npmjs.com/package/@alea-drand/sdk) and look for the green "Provenance" badge. No badge → do not install.
 
 ## Community & Support
 

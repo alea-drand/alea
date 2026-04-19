@@ -33,7 +33,7 @@ Initial release. Solana devnet only; mainnet deployment is the Phase 5 gate.
 - Re-exports: `AleaVerifier` (Program type), `Config`, `AleaError`
 - Dev-dep devnet integration tests (`#[ignore]` by default)
 
-### Added — TypeScript SDK (`@alea/sdk` on npm)
+### Added — TypeScript SDK (`@alea-drand/sdk` on npm)
 
 - ESM-only, browser-compatible (no Node built-ins at runtime; IDL inlined at build)
 - `getVerifiedRandomness(options)` — fetches latest drand beacon, submits verify tx, returns 32 bytes
