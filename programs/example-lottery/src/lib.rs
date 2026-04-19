@@ -152,14 +152,17 @@ pub mod example_lottery {
             GameError::StaleBeacon
         );
 
-        // Guard 3: CPI to Alea — one line.
+        // Guard 3: CPI to Alea — one line. Returns VerifiedRandomness
+        // (must_use wrapper so a forgotten `.into_inner()` / `.as_bytes()`
+        // produces a compile warning instead of silently dropping bytes).
         let randomness = alea_sdk::cpi::verify(
             ctx.accounts.alea_program.to_account_info(),
             ctx.accounts.alea_config.to_account_info(),
             ctx.accounts.payer.to_account_info(),
             round,
             signature,
-        )?;
+        )?
+        .into_inner();
 
         // Guard 4: capture return data IMMEDIATELY — Solana overwrites on next CPI.
         // `randomness` is already a [u8; 32] local variable above.

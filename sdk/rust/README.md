@@ -80,14 +80,17 @@ pub fn settle_match(
         YourError::StaleBeacon,
     );
 
-    // MANDATORY: verify the drand beacon via CPI — one line.
+    // MANDATORY: verify the drand beacon via CPI — one line. Returns
+    // alea_sdk::VerifiedRandomness (must_use wrapper) so a forgotten
+    // `.into_inner()` / `.as_bytes()` produces a compile warning
+    // instead of silently dropping the 32 bytes.
     let randomness = alea_sdk::cpi::verify(
         ctx.accounts.alea_program.to_account_info(),
         ctx.accounts.alea_config.to_account_info(),
         ctx.accounts.payer.to_account_info(),
         round,
         signature,
-    )?;
+    )?.into_inner();
 
     // MANDATORY: read the result IMMEDIATELY.
     // Solana return data is overwritten by any subsequent CPI call.
@@ -211,19 +214,51 @@ CI enforces table-to-enum coherence on every PR (Phase 6).
 
 ## Troubleshooting
 
-### `cargo build-sbf` fails on `constant_time_eq@0.4.3 requires rustc 1.95`
+### `constant_time_eq@0.4.3 requires rustc 1.95` (both `cargo check` AND `cargo build-sbf`)
 
-The Solana BPF toolchain's embedded rustc is ~1.89-dev, lagging the Rust
-ecosystem by 6+ minor versions. Modern crates.io crates sometimes assume
-newer rustc. Workaround — pin the offending dep in your own `Cargo.toml`:
+**This affects any Rust toolchain older than 1.95, not just BPF.** Even on
+native `cargo check` / `cargo doc` with stable rustc 1.94 (the current
+release at the time of writing), the resolver picks `constant_time_eq
+0.4.3` which requires rustc 1.95+. The Solana BPF toolchain's embedded
+rustc is ~1.89-dev so BPF builds hit it too.
+
+Workaround — pin the offending transitive in your own `Cargo.toml`:
 
 ```toml
 [dependencies]
 alea-sdk = "0.1"
 
-# Pin sub-dep to a BPF-compatible version:
+# Phase 4.5 fix: pin this transitive to a version that compiles on
+# both current stable rustc and Solana BPF toolchain's 1.89-dev:
 constant_time_eq = "=0.4.2"
 ```
+
+Re-verify after every `cargo update` — if cargo bumps `constant_time_eq`
+past 0.4.2 the pin gets silently overridden unless you use `=0.4.2`
+(exact version, not `0.4.2` which is semver-compatible).
+
+### Anchor's `declare_id!` macro — misleading error cascade on bad base58 length
+
+If you copy the Quick Start and paste a placeholder program ID like
+`MyProg111111111111111111111111111111111`, you'll see:
+
+```
+error: pubkey array is not 32 bytes long: len=N
+error: cannot find value `ID` in crate `crate`
+```
+
+That second error is misleading — it suggests the program ID import is
+broken, but the actual issue is that Anchor's `declare_id!` requires
+exactly a **44-character base58-encoded ed25519 pubkey** (32 bytes =
+44 base58 chars). Generate a real one with:
+
+```bash
+solana-keygen new --outfile /tmp/my-program-id.json --no-bip39-passphrase --force
+solana-keygen pubkey /tmp/my-program-id.json
+```
+
+This is an Anchor UX issue, not an Alea-specific one, but new consumers
+hit it on first integration.
 
 See [`2026-04-19-solana-bpf-rustc-lag-external-consumers`](https://github.com/alea-drand/alea/blob/main/build-spec/decisions/) for the full list of commonly-affected transitives (updated as Solana's toolchain evolves).
 
