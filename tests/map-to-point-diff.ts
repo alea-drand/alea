@@ -10,11 +10,9 @@
 //      compares against fixture Q0/Q1 values)
 // => BPF == NATIVE transitively.
 //
-// Fixture u0/u1 + expected Q0/Q1 values are from build-spec/testing/
-// fixtures/round-1.json + round-9337227.json (gnark-crypto MapToG1
-// reference, committed during Phase 2 T1.03). Inlined here so this
-// test file is self-contained and doesn't depend on the gitignored
-// build-spec/ directory.
+// Fixture u0/u1 + expected Q0/Q1 values were generated from drand rounds
+// 1 and 9337227 using gnark-crypto's MapToG1 reference implementation,
+// then inlined here so this test file is self-contained.
 
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
@@ -34,10 +32,9 @@ interface ParityCase {
   description: string;
 }
 
-// 4 cases: u0 and u1 from each of round-1 and round-9337227. Values
-// lifted verbatim from build-spec/testing/fixtures/round-1.json and
-// round-9337227.json (source: gnark-crypto/ecc/bn254 MapToG1,
-// independent reference per T1.07).
+// 4 cases: u0 and u1 from each of drand round 1 and round 9337227.
+// Expected Q0/Q1 values were generated from gnark-crypto/ecc/bn254
+// MapToG1 as an independent cross-check reference.
 const PARITY_CASES: ParityCase[] = [
   {
     round: 1,

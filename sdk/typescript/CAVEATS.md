@@ -1,31 +1,49 @@
 # @alea-drand/sdk — Maturity Disclosures
 
-Six things to know before using this SDK in production.
+Five things to know before using this SDK in production.
 
 ---
 
-## 1. Devnet Only (Phase 5 Resolution: Mainnet Deploy)
+## 1. Cluster Surface — Devnet Live, Mainnet Status
 
-The program at `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U` is deployed on **Solana devnet only**. Mainnet deploy is the Phase 5 gate.
+The program is live on **Solana devnet** at `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U`, verified end-to-end against live drand rounds.
 
-Alea's program ID is cluster-agnostic — the SDK exports both `DEVNET_PROGRAM_ID` and `MAINNET_PROGRAM_ID` pointing to the same bytes (distinct symbols for intent clarity in consumer code). If you use a mainnet `Connection` before Phase 5, the tx fails at the Solana RPC layer with "program not found" — Solana itself is the safety rail. For production testing prior to Phase 5, use a devnet `Connection("https://api.devnet.solana.com")`.
+Alea's program ID is cluster-agnostic — the SDK exports both `DEVNET_PROGRAM_ID` and `MAINNET_PROGRAM_ID` pointing to the same bytes (distinct symbols for intent clarity). Your `Connection` object selects the cluster. If mainnet isn't yet live when you read this, a mainnet `Connection` fails at the Solana RPC layer with "program not found" — Solana itself is the safety rail. Check the main [README.md](../../README.md) for current deployment status.
 
-## 2. Internal Audit Only (Phase 5 Resolution: External Paid Audit)
+**What would close this:** mainnet deployment.
 
-The Alea verifier has passed multi-pass internal audits: 15-round persona audit (10 Claude + 5 Codex, averaged 8.66/10, zero critical findings), plus a pre-publish 12-agent audit (8 cold-read personas + 4 adversarial red-team agents) run 2026-04-19 — zero exploitable cryptographic or replay vulnerabilities, zero T1 findings against mandatory-constraint-following consumers. An external paid security firm audit is planned for Phase 5 before mainnet. Do not use in production until that audit is complete.
+---
 
-## 3. Deployer Keypair (Phase 5 Resolution: Squads 2-of-3 Multisig)
+## 2. External Audit
 
-Upgrade authority is currently held by a single deployer keypair. A Squads 2-of-3 multisig transition is planned per ADR 0009. Until then, the deployer key is a single point of failure for program upgrades. Phase 5 completes the multisig transition.
+Alea has undergone self-imposed multi-pass adversarial review prior to publication, plus a combined **23.82 billion iterations** of fuzz testing across 5 cargo-fuzz targets with 0 crashes, 0 memory errors. Proof tarballs + coverage HTML + per-target metadata are published at the [`v0.2.0-audit-passed`](https://github.com/alea-drand/alea/releases/tag/v0.2.0-audit-passed) GitHub release.
 
-## 4. CPI Interface v1 Frozen (Phase 5 Resolution: Battle-Tested Mainnet)
+No external paid security audit has been performed. The internal testing is extensive, but it's not the same thing as a firm-signed audit report.
 
-The v1 CPI interface is frozen per ADR 0028, validated across 4 audit rounds and a cpi-consumer Pattern A integration test. It has not yet been exercised in a mainnet environment. Additive changes may occur in v2+; breaking changes will follow semver with a deprecation period.
+**What would close this:** an external paid audit. This is a goal if/when grant funding supports it — not a v0.1.0 commitment.
 
-## 5. BPF 6006 None-Arm Runtime Test Open (Phase 5 Resolution: Confirmed)
+---
 
-An open item exists for the `PairingError` (6006) code path: the BPF `alt_bn128_pairing` syscall's `None`-arm (failure case) has not been exercised in a live runtime test. This is a convergent finding from internal + Codex audit rounds (P10). The happy path is fully tested across 10+ devnet rounds. Phase 5 closes this gap with an explicit failure-injection test.
+## 3. Upgrade Authority — Single Deployer Key
 
-## 6. Fuzz Coverage (Not a Production-Hours Substitute)
+The verifier program is currently upgradeable, controlled by a single deployer keypair. Migration to a Squads 2-of-3 multisig is planned after mainnet stabilises, and the long-term intent is to zero out the upgrade authority entirely. Alea holds no user funds on-chain — there's no TVL surface for an authority compromise to attack — but a compromised key could replace the deployed program binary. Consumers wanting belt-and-suspenders can verify the deployed binary SHA256 against the value published in the main README.
 
-23.82 billion fuzzing iterations have been run against the Alea verifier with 0 crashes found. Proof tarballs are published at [alea-drand/alea](https://github.com/alea-drand/alea). This is a strong signal, not a guarantee. Fuzzing complements but does not replace production runtime hours or a paid security audit.
+**What would close this:** multisig transition, then immutability.
+
+---
+
+## 4. v1 CPI Interface — Frozen, Not Yet Battle-Tested at Scale
+
+The v1 CPI interface (`verify(round, signature) -> [u8; 32]`) is frozen: instruction signature, Config layout, Verify accounts, return-data format, and `BeaconVerified` event schema are not modified by upgrades. Additive changes (new instructions) can happen at minor versions; breaking changes require a new program ID. CI enforces this on every PR.
+
+The interface hasn't yet seen high-volume production traffic, so edge cases specific to real-world consumer patterns are unknown.
+
+**What would close this:** real-world mainnet usage across a variety of consumer programs.
+
+---
+
+## 5. BPF Runtime Error Path — One Open Item
+
+A specific runtime error path (`AleaError::PairingError`, code 6006) can only be triggered by a real BPF syscall `Err` return. This has not yet been exercised in a live BPF environment. The error code contract is stable; the branch is correct and audited. The gap is live BPF coverage of a path that's not easy to induce.
+
+**What would close this:** a BPF-level test that injects a syscall error to exercise this branch.

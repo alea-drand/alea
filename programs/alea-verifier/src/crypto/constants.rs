@@ -65,10 +65,10 @@ pub const EXPECTED_EVMNET_CHAIN_HASH: [u8; 32] = [
     0x28, 0x2b, 0x27, 0x27, 0xec, 0xce, 0xd5, 0x00, 0x32, 0x18, 0x77, 0x51, 0x16, 0x6e, 0xc8, 0xc3,
 ];
 
-// T2.E — byte-equality guards for `genesis_time` + `period` against the
-// canonical drand evmnet chain parameters. Source:
-// `build-spec/testing/fixtures/chain-info.json` (genesis_time=1727521075,
-// period=3). These make config.initialize/update_config fully deterministic
+// Byte-equality guards for `genesis_time` + `period` against the canonical
+// drand evmnet chain parameters (genesis_time=1727521075, period=3; see
+// https://api.drand.sh/chains for the public chain info).
+// These make config.initialize/update_config fully deterministic
 // — no authority can set genesis=0 or period=0 (which would DoS consumer
 // programs reading config.period in timing math).
 //
@@ -164,16 +164,14 @@ mod tests {
         assert_eq!(G2_GENERATOR.len(), 128);
     }
 
-    // T1.10 — g2-non-subgroup fallback-path rejection. Previously the
-    // `build-spec/testing/fixtures/g2-non-subgroup.json` fixture was
-    // orphaned (verify-fixtures.ts only checked structural fields, never
-    // fed the hex into any validator). ADR 0027's fallback path means
-    // the actual rejection code is 6008 WrongPubkey (byte-equality guard),
-    // NOT 6005 InvalidG2Point (primary path, unreachable under fallback).
+    // Exercises the fallback-path rejection against a non-subgroup G2
+    // point. The actual rejection code is 6008 WrongPubkey (byte-equality
+    // guard), NOT 6005 InvalidG2Point (the primary path is unreachable
+    // under the current byte-equality fallback).
     //
-    // This test exercises the fallback path against a verified non-
-    // subgroup G2 point (gnark-crypto IsInSubGroup()=false, generated
-    // via build-spec/testing/scripts/g2gen/main.go seed=0 x=(0,7)):
+    // The non-subgroup G2 fixture below was generated offline from a
+    // known-non-subgroup x-coordinate (0, 7) and cross-validated with
+    // gnark-crypto's IsInSubGroup()=false:
     //   1. Proves non-subgroup bytes != EXPECTED_EVMNET_PUBKEY → guard
     //      WOULD fire with AleaError::WrongPubkey (6008)
     //   2. Cross-validates the fixture's on-curve + non-subgroup claims

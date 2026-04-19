@@ -23,7 +23,9 @@ case "${1-}" in
     *)            echo "Usage: $0 [--dry-run | --smoke-only]" >&2; exit 2 ;;
 esac
 
-REPO="/Users/aaron/dev/work/alea"
+# Resolve repo root relative to this script's location (portable across
+# developer machines + CI runners) with an env override for CI.
+REPO="${ALEA_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 FUZZ_DIR="$REPO/programs/alea-verifier/fuzz"
 PROGRAM_DIR="$REPO/programs/alea-verifier"
 SCRIPTS="$FUZZ_DIR/scripts"

@@ -17,8 +17,8 @@
 //   ANCHOR_PROVIDER_URL=... ANCHOR_WALLET=... \
 //   npx ts-node scripts/devnet-verify-loop.ts --failure-cases
 //
-// Spec: build-spec/phases/phase-3-devnet.md §3.3-3.6
-// Plan: /Users/aaron/.claude/plans/use-rag-to-get-unified-journal.md Phase F-H
+// Runs a loop of verify transactions against the live devnet deployment
+// to confirm end-to-end behavior (round range, failure cases, CU data).
 
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";

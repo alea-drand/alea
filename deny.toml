@@ -38,12 +38,12 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 # Default: fail CI on any active advisory
 yanked = "deny"
 ignore = [
-  # Phase 4.5 baseline — all ignored items are transitives inherited from
-  # Anchor 0.30.1 + Solana 1.18.x which we can't upgrade without breaking
-  # the locked toolchain. Each line includes review date; re-review at
-  # the Phase 5 external audit cutoff. Escalate if new items appear from
+  # Baseline — all ignored items are transitives inherited from Anchor
+  # 0.30.1 + Solana 1.18.x which can't be upgraded without breaking the
+  # locked toolchain. Each line includes review date; re-review at the
+  # next external audit cutoff. Escalate if new items appear from
   # non-inherited deps — those would be real findings.
-  { id = "RUSTSEC-2024-0344", reason = "curve25519-dalek timing variance — pulled via ed25519 in Anchor/Solana deps; no direct use in Alea BN254 code. Reviewed 2026-04-19; re-review Phase 5." },
+  { id = "RUSTSEC-2024-0344", reason = "curve25519-dalek timing variance — pulled via ed25519 in Anchor/Solana deps; no direct use in Alea BN254 code. Reviewed 2026-04-19." },
   { id = "RUSTSEC-2024-0388", reason = "derivative unmaintained; pulled transitively via Anchor macros. No drop-in alternative until Anchor upstream moves. Reviewed 2026-04-19." },
   { id = "RUSTSEC-2024-0436", reason = "paste unmaintained; pulled transitively via Solana's msg! macro infrastructure. Reviewed 2026-04-19." },
   { id = "RUSTSEC-2025-0141", reason = "bincode 1.x unmaintained; pulled transitively via Solana 1.18.x. Ecosystem migration to bincode 2.x is pending upstream. Reviewed 2026-04-19." },

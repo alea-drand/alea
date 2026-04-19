@@ -4,8 +4,7 @@
   "workspaces": ["sdk/typescript"],
   "scripts": {
     "test": "anchor test",
-    "build": "anchor build",
-    "generate-vectors": "cd build-spec/testing/scripts && node --experimental-strip-types generate-test-vectors.ts"
+    "build": "anchor build"
   },
   "devDependencies": {
     "@coral-xyz/anchor": "=0.30.1",

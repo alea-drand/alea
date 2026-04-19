@@ -1,6 +1,5 @@
-//! Unit tests for `is_round_recent` — Phase 3.7.A gate.
+//! Unit tests for `is_round_recent`.
 //!
-//! Spec reference: `build-spec/phases/phase-3-devnet.md §3.7`
 //! Covers the three canonical cases:
 //!   - Recent  (round emitted 5s ago)   → true
 //!   - Stale   (round emitted 600s ago) → false
