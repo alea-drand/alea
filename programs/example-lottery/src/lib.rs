@@ -10,7 +10,7 @@
 //! This is a test-only / demonstration program. `publish = false` in Cargo.toml.
 //! Use `anchor build --no-idl -p example-lottery` for local testing.
 //!
-//! # Correlated-randomness warning (Phase 4.5 Marcus T2)
+//! # Correlated-randomness warning
 //!
 //! Multiple bets resolving against the SAME drand round share the same 32
 //! bytes of randomness — each bet merely samples a different u64 window

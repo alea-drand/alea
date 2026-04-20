@@ -35,7 +35,7 @@ use anchor_lang::prelude::*;
 ///
 /// By wrapping in a `#[must_use]` struct, `alea_sdk::cpi::verify(...)?;`
 /// produces a compile-time `unused_must_use` warning — the consumer is
-/// forced to capture the result. Phase 4.5 T1-17 integration-audit fix.
+/// forced to capture the result.
 ///
 /// # Usage
 ///

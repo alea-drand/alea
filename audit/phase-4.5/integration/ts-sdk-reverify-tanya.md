@@ -1,10 +1,10 @@
-# @alea/sdk TypeScript Re-Verification — Tanya Morris
+# @alea-drand/sdk TypeScript Re-Verification — Tanya Morris
 
 **Date:** 2026-04-19
 **Auditor persona:** Tanya Morris — junior-to-mid TS dev, 3yr JS/TS, 6mo Solana hobby,
 first real dApp, first time seeing drand. Not a security expert.
 **Method:** Fresh environment `/tmp/alea-ts-verify-2/wheel-raffle/`. SDK installed via
-local path dep (`npm install /Users/aaron/dev/work/alea/sdk/typescript`). No modifications
+local path dep (`npm install <repo-root>/sdk/typescript`). No modifications
 to the SDK repo.
 **Node version:** v25.8.1
 **Test environment:** macOS, Solana devnet

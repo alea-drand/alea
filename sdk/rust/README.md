@@ -4,7 +4,7 @@
 
 Any Anchor program can receive cryptographically verified on-chain randomness with a single CPI call — no oracles, no callbacks, no off-chain coordination.
 
-> **Warning:** Read [CAVEATS.md](CAVEATS.md) before integrating. This crate is live on Solana devnet with an internal audit passing (avg 8.66/10 across 10 Claude + 5 Codex persona rounds); external paid firm review and mainnet deployment are Phase 5 gates.
+> **Warning:** Read [CAVEATS.md](CAVEATS.md) before integrating. This crate is live on Solana devnet. Mainnet deployment is pending.
 
 ---
 
@@ -187,16 +187,16 @@ The TypeScript SDK (`@alea-drand/sdk`) injects this automatically. Rust consumer
 | Cluster | Program ID |
 |---------|-----------|
 | Devnet  | `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U` |
-| Mainnet | Pending Phase 5 (same vanity ID — cluster binding identical) |
+| Mainnet | Pending (same vanity ID — cluster binding identical) |
 
-Devnet-verified across 10 live rounds. Mainnet traffic begins Phase 5.
+Devnet-verified across 10 live rounds. Mainnet deployment pending.
 
 ---
 
 ## Error Codes
 
 Canonical source: [`programs/alea-verifier/src/errors.rs`](https://github.com/alea-drand/alea/blob/main/programs/alea-verifier/src/errors.rs).
-CI enforces table-to-enum coherence on every PR (Phase 6).
+CI enforces table-to-enum coherence on every PR.
 
 | Code | Name | Meaning |
 |------|------|---------|
@@ -208,7 +208,7 @@ CI enforces table-to-enum coherence on every PR (Phase 6).
 | 6005 | `InvalidG2Point` | **Reserved (unreachable under ADR 0027 fallback path)** — do not retry |
 | 6006 | `PairingError` | `alt_bn128_pairing` syscall returned Err or wrong-length output (infrastructure) |
 | 6007 | `WrongChainHash` | `Config.chain_hash` does not match `EXPECTED_EVMNET_CHAIN_HASH` (wrong-chain deployment) |
-| 6008 | `WrongPubkey` | `Config.pubkey_g2` does not match `EXPECTED_EVMNET_G2_PUBKEY` — also emitted by `alea_sdk::cpi::verify`'s owner check on the config account (T1-08, Phase 4.5) |
+| 6008 | `WrongPubkey` | `Config.pubkey_g2` does not match `EXPECTED_EVMNET_G2_PUBKEY` — also emitted by `alea_sdk::cpi::verify`'s owner check on the config account |
 | 6009 | `ReturnDataMissing` | **Reserved (unreachable under ADR 0030 Pattern A)** |
 | 6010 | `InvalidGenesisTime` | `Config.genesis_time` does not match `EXPECTED_EVMNET_GENESIS_TIME` |
 | 6011 | `InvalidPeriod` | `Config.period` does not match `EXPECTED_EVMNET_PERIOD` |
@@ -234,8 +234,8 @@ Workaround — pin the offending transitive in your own `Cargo.toml`:
 [dependencies]
 alea-sdk = "0.1"
 
-# Phase 4.5 fix: pin this transitive to a version that compiles on
-# both current stable rustc and Solana BPF toolchain's 1.89-dev:
+# Pin this transitive to a version that compiles on both current stable
+# rustc and Solana BPF toolchain's 1.89-dev:
 constant_time_eq = "=0.4.2"
 ```
 
@@ -285,7 +285,7 @@ Every tx that CPIs into Alea MUST include `ComputeBudgetInstruction::set_compute
 
 This can come from two code paths:
 1. On-chain `verify` handler — `Config.pubkey_g2 != EXPECTED_EVMNET_G2_PUBKEY` (wrong-chain init); redeploy with the correct `chain_hash` / `pubkey_g2`
-2. `alea_sdk::cpi::verify` helper — the supplied `config` account's owner is not `alea_sdk::PROGRAM_ID` (defense-in-depth check added Phase 4.5 T1-08 for non-Anchor callers)
+2. `alea_sdk::cpi::verify` helper — the supplied `config` account's owner is not `alea_sdk::PROGRAM_ID` (defense-in-depth check for non-Anchor callers)
 
 If you're an Anchor program user with `#[account(seeds = [b"config"], bump, seeds::program = alea_program.key())]` on your config, the second case is not reachable for you — the PDA re-derivation catches it first.
 
@@ -294,6 +294,5 @@ If you're an Anchor program user with `#[account(seeds = [b"config"], bump, seed
 ## Links
 
 - GitHub: [alea-drand/alea](https://github.com/alea-drand/alea)
-- Full docs site: Coming Phase 6
 - License: Apache 2.0 — see [LICENSE](LICENSE)
 - Maturity disclosures: [CAVEATS.md](CAVEATS.md)

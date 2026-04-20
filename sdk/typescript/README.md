@@ -2,7 +2,7 @@
 
 Verified drand randomness on Solana in one call.
 
-> **v0.1.x is DEVNET only — mainnet program deploys in Phase 5.** Alea's program ID is cluster-agnostic; `DEVNET_PROGRAM_ID` and `MAINNET_PROGRAM_ID` point to the same bytes. Using a mainnet `Connection` before Phase 5 fails at the Solana RPC layer ("program not found"). Read [CAVEATS.md](CAVEATS.md) before production use. External paid audit scheduled for Phase 5.
+> **v0.1.x is DEVNET only — mainnet deployment pending.** Alea's program ID is cluster-agnostic; `DEVNET_PROGRAM_ID` and `MAINNET_PROGRAM_ID` point to the same bytes. Using a mainnet `Connection` before mainnet deploys fails at the Solana RPC layer ("program not found"). Read [CAVEATS.md](CAVEATS.md) before production use.
 
 ## Install
 
@@ -214,7 +214,7 @@ This SDK is for off-chain consumers. If you're building an on-chain program that
 | Network | Program ID |
 |---------|-----------|
 | Devnet  | `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U` |
-| Mainnet | Same vanity ID; program not yet deployed on mainnet (Phase 5 gate). Mainnet `Connection` will fail at the RPC layer with "program not found" until deploy. |
+| Mainnet | Same vanity ID; program not yet deployed on mainnet. Mainnet `Connection` will fail at the RPC layer with "program not found" until deploy. |
 
 ## Zero Telemetry
 
