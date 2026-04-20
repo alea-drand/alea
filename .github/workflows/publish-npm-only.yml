@@ -1,0 +1,39 @@
+name: Publish @alea-drand/sdk to npm (one-off)
+
+# One-off workflow to complete the v0.1.0 npm publish after the original
+# release.yml run succeeded on cargo but failed on Sigstore provenance
+# (private repo). Repo is now public; this runs npm publish with
+# provenance in isolation.
+#
+# Delete this workflow after v0.1.0 is live. Future releases go through
+# release.yml on tag push.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install + build + publish
+        working-directory: sdk/typescript
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm ci
+          npm run build
+          test -f dist/idl.js && test -f dist/idl.d.ts || { echo "IDL TS bundle missing"; exit 1; }
+          npm publish --access public --provenance
