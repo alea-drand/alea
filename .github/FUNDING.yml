@@ -3,7 +3,7 @@
 # Populate the handles you want to expose; remove or comment out the rest.
 # Docs: https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
 
-# github: []              # your GitHub Sponsors handle (e.g., [qnapz])
+# github: []              # GitHub Sponsors handle (e.g., [aaronisafk])
 # custom: []              # any custom URLs (e.g., ["https://alea.so/sponsor"])
 # open_collective:        # open_collective handle
 # ko_fi:                  # ko-fi handle
