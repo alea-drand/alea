@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "programs/alea-verifier",
-    "programs/cpi-consumer",
     "programs/example-lottery",
     "sdk/rust",
 ]

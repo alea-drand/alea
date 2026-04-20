@@ -60,12 +60,9 @@ jobs:
           npm ci
           npm test
 
-      # Note: The legacy "Verify fixtures (T2.U)" step referenced
-      # build-spec/testing/scripts which is a PRIVATE directory (gitignored
-      # from the public repo). The fixtures it used to verify are now
-      # covered by sdk/rust/tests/is_round_recent.rs + sdk/typescript/
-      # tests/drand.test.ts + the committed target/idl/alea_verifier.json
-      # enforced via idl-diff.yml on every PR.
+      # Fixture coverage lives in sdk/rust/tests/is_round_recent.rs +
+      # sdk/typescript/tests/drand.test.ts. IDL drift is enforced on
+      # every PR via idl-diff.yml.
 
   publish:
     needs: [test]   # gate publish on passing tests

@@ -9,7 +9,6 @@ alea_verifier = "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U"
 
 [programs.localnet]
 alea_verifier = "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U"
-cpi-consumer = "CjG5jdi4unFM2QJ1Z46kB58fHpGbtiEj2m8PmEyPSKvj"
 
 [programs.mainnet]
 alea_verifier = "ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U"
@@ -19,8 +18,7 @@ url = "https://api.apr.dev"
 
 [provider]
 cluster = "Localnet"
-wallet = "~/.config/solana/alea-deployer.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 initialize = "npx ts-node scripts/initialize.ts"
-test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

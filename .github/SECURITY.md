@@ -41,6 +41,4 @@ Intent documented; activation post-grant. Until then, reporters are credited pub
 
 ## References
 
-- [README.md §Governance](https://github.com/alea-drand/alea#governance--upgrade-roadmap) — upgrade authority roadmap
-- [`audit/phase-4.5/THREAT-MODEL.md`](../audit/phase-4.5/THREAT-MODEL.md) — trusted-vs-untrusted surface enumeration
-- [`audit/phase-4.5/FINDINGS-CONSOLIDATED.md`](../audit/phase-4.5/FINDINGS-CONSOLIDATED.md) — Phase 4.5 audit findings
+- [README.md](../README.md) — project overview, program addresses, verification instructions

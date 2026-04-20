@@ -112,6 +112,4 @@ By contributing, you agree that your contributions will be licensed under the Ap
 - [`NOTICE`](NOTICE) — third-party attributions (drand, kevincharm/bls-bn254, randa-mu/bls-solana, noble libraries)
 - [`sdk/rust/README.md`](sdk/rust/README.md) — Rust CPI integration guide + troubleshooting
 - [`sdk/typescript/README.md`](sdk/typescript/README.md) — TypeScript SDK reference
-- [`audit/phase-4.5/`](audit/phase-4.5/) — Phase 4.5 audit findings + threat model
-- [`validation-report.md`](validation-report.md) — validation evidence across phases
 - [`.github/SECURITY.md`](.github/SECURITY.md) — vulnerability disclosure process

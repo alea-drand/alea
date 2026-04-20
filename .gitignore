@@ -5,7 +5,6 @@ target/*
 !target/idl
 target/idl/*
 !target/idl/alea_verifier.json
-!target/idl/cpi_consumer.json
 .anchor/
 node_modules/
 test-ledger/
@@ -16,10 +15,10 @@ test-ledger/
 deployer*.json
 target/deploy/*.json
 
-# Build spec (development notes — not public)
+# Private development notes
 build-spec/
 
-# Claude Code (local config)
+# Claude Code local config
 .claude/
 
 # IDE
@@ -33,16 +32,12 @@ build-spec/
 .env
 .env.*
 
-# Monitoring
-scripts/collect-metrics.ts
-
-# Raw CU benchmark data — regeneratable via anchor test. validation-report.md
-# summarizes the stats; per-round data doesn't need to bloat the repo.
-validation-report-phase2-cu.json
-
-# Audit byproducts (Phase 2.5 Stage 1 static analysis output)
+# Static-analysis byproducts
 .xray/
 programs/alea-verifier/programs_alea-verifier.ll
+
+# Raw CU benchmark data — regeneratable via anchor test
+validation-report-phase2-cu.json
 
 # Subcrate cargo build outputs (root target/ already handled above with
 # idl-exception; this catches per-subcrate target/ dirs that cargo-build-sbf
