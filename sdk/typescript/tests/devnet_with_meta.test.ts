@@ -7,9 +7,12 @@ import {
   getVerifiedRandomnessWithMeta,
 } from "../src/client.js";
 import { DEVNET_PROGRAM_ID } from "../src/constants.js";
+import { AleaError } from "../src/errors.js";
 import {
   ROUND_1_SIGNATURE_HEX,
   ROUND_1_EXPECTED_RANDOMNESS_HEX,
+  ROUND_9337227_SIGNATURE_HEX,
+  ROUND_9337227_EXPECTED_RANDOMNESS_HEX,
   hexToBytes,
   bytesToHex,
 } from "./fixtures.js";
@@ -101,6 +104,56 @@ describe("devnet integration — meta variants", () => {
     expect(result.costLamports).toBeGreaterThan(0);
   });
 
+  it("verifyDrandBeaconWithMeta returns full meta shape on round-9337227 fixture (second-round smoke)", async () => {
+    if (!ENABLED || !funded) {
+      console.warn("[skip] ALEA_DEVNET_TESTS not set or airdrop failed");
+      return;
+    }
+
+    const sig = hexToBytes(ROUND_9337227_SIGNATURE_HEX);
+    const result = await verifyDrandBeaconWithMeta({
+      connection,
+      signer: payer,
+      round: 9337227n,
+      signature: sig,
+      programId: DEVNET_PROGRAM_ID,
+    });
+
+    expect(result.randomness).toHaveLength(32);
+    expect(bytesToHex(result.randomness)).toBe(ROUND_9337227_EXPECTED_RANDOMNESS_HEX);
+    expect(result.tx.length).toBeGreaterThan(80);
+    expect(result.slot).toBeGreaterThan(0);
+    expect(result.computeUnitsUsed).toBeGreaterThan(0);
+    expect(result.costLamports).toBeGreaterThan(0);
+  });
+
+  it("verifyDrandBeaconWithMeta propagates AleaError 6000 on wrong-round (error-path parity with verifyDrandBeacon)", async () => {
+    if (!ENABLED || !funded) {
+      console.warn("[skip] ALEA_DEVNET_TESTS not set or airdrop failed");
+      return;
+    }
+
+    // round=1 + round-9337227's signature → pairing fails → AleaError 6000
+    const sig = hexToBytes(ROUND_9337227_SIGNATURE_HEX);
+
+    let caught: unknown;
+    try {
+      await verifyDrandBeaconWithMeta({
+        connection,
+        signer: payer,
+        round: 1n,
+        signature: sig,
+        programId: DEVNET_PROGRAM_ID,
+      });
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught).toBeInstanceOf(AleaError);
+    expect((caught as AleaError).code).toBe(6000);
+  });
+
   it("getVerifiedRandomnessWithMeta returns round+signature+full meta", async () => {
     if (!ENABLED || !funded) {
       console.warn("[skip] ALEA_DEVNET_TESTS not set or airdrop failed");
@@ -125,5 +178,41 @@ describe("devnet integration — meta variants", () => {
     expect(result.slot).toBeGreaterThan(0);
     expect(result.computeUnitsUsed).toBeGreaterThan(0);
     expect(result.costLamports).toBeGreaterThan(0);
-  }, 45_000); // drand fetch + verify can take ~10-15s on devnet
+
+    // Explorer-link sanity: tx sig should be base58 of ~87 chars
+    expect(result.tx.length).toBeGreaterThan(80);
+    expect(result.tx.length).toBeLessThan(100);
+
+    // computeUnitsUsed should be in the expected range for Alea verify
+    expect(result.computeUnitsUsed).toBeGreaterThan(300_000);
+    expect(result.computeUnitsUsed).toBeLessThan(500_000);
+  }, 45_000);
+
+  it("getVerifiedRandomnessWithMeta respects AbortSignal before sending tx", async () => {
+    if (!ENABLED || !funded) {
+      console.warn("[skip] ALEA_DEVNET_TESTS not set or airdrop failed");
+      return;
+    }
+
+    const controller = new AbortController();
+    controller.abort();  // abort before call
+
+    let caught: unknown;
+    try {
+      await getVerifiedRandomnessWithMeta({
+        connection,
+        signer: payer,
+        programId: DEVNET_PROGRAM_ID,
+        signal: controller.signal,
+      });
+    } catch (e) {
+      caught = e;
+    }
+
+    // fetchBeacon catches the abort first (throws AbortError/DOMException);
+    // verifyDrandBeaconWithMeta would catch it with AleaError 6103 if
+    // fetchBeacon resolves first. Accept either — the contract is just
+    // "throws before a tx lands on-chain."
+    expect(caught).toBeDefined();
+  });
 });
