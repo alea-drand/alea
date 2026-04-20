@@ -19,7 +19,6 @@ overflow-checks = true
 lto = "fat"
 codegen-units = 1
 
-# Phase 4.5 T1-15: [patch.crates-io] removed. Having a live table header
-# (even with all entries commented) signals a fragile dep posture to grant
-# reviewers, and accidental uncomment would poison every downstream
-# consumer's lockfile. Re-add if genuinely needed in the future.
+# Intentionally no [patch.crates-io] — keeps dep resolution pristine.
+# A live table (even commented) reads as fragile dep posture and an
+# accidental uncomment would poison every downstream consumer's lockfile.

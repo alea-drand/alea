@@ -46,7 +46,6 @@ pub fn inv0(x: &Fq) -> Fq {
 // allocates ~200 bytes internally; 10+ inlined Fq ops in map_to_point blew the
 // 4KB frame (measured 5520 bytes pre-fix). `#[inline(never)]` wrappers force
 // each op into its own frame so intermediates don't accumulate in the caller.
-// See ~/vault/80-learnings/2026-04-16-bpf-stack-frame-management.md.
 
 #[inline(never)]
 fn fq_mul(a: &Fq, b: &Fq) -> Fq {

@@ -7,7 +7,7 @@
 // Gate C (breakthrough confirmation):
 //   AC-16: max < 1,000,000 CU
 //   AC-17: variance < 20% of mean
-// Aaron-confirmed policy: ANY max > 1M = hard stop, no workaround.
+// Policy: ANY max > 1M = hard stop, no workaround.
 
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
@@ -208,7 +208,7 @@ describe("Wave 11 — CU Benchmark (BREAKTHROUGH GATE)", () => {
     );
     console.log(`  Full distribution written to ${reportPath}`);
 
-    // Gate C assertions (Aaron-confirmed policy: ANY overage = hard stop)
+    // Gate C assertions (policy: ANY overage = hard stop)
     expect(s.max, `AC-16: max CU must be < 1,000,000 (got ${s.max})`).to.be.lt(
       1_000_000,
     );

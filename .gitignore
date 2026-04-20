@@ -1,7 +1,6 @@
 # Solana build artifacts — ignore everything under target/ EXCEPT the
 # hand-written IDL, which must be committed (Anchor 0.30.1 proc-macro2
-# incompat prevents auto-gen; see ~/vault/80-learnings/2026-04-16-
-# anchor-030-proc-macro2-incompatibility.md).
+# incompat prevents auto-gen).
 target/*
 !target/idl
 target/idl/*
@@ -17,7 +16,7 @@ test-ledger/
 deployer*.json
 target/deploy/*.json
 
-# Build spec (private)
+# Build spec (development notes — not public)
 build-spec/
 
 # Claude Code (local config)
@@ -34,7 +33,7 @@ build-spec/
 .env
 .env.*
 
-# Monitoring (private)
+# Monitoring
 scripts/collect-metrics.ts
 
 # Raw CU benchmark data — regeneratable via anchor test. validation-report.md
