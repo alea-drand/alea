@@ -1,10 +1,8 @@
-// scripts/devnet-verify-loop.ts — Phase 3.3 + 3.4 + 3.6 devnet test harness.
+// scripts/devnet-verify-loop.ts — devnet verification test harness.
 //
 // Live mode (default): poll drand API for each consecutive round as it's
 // emitted, submit a verify tx to devnet, assert randomness = sha256(sig),
-// capture CU. Designed to be run twice in this session — first with
-// --count 1 (surface result to Aaron), then with --count 9 for the
-// remaining rounds once Aaron approves.
+// capture CU.
 //
 // Failure mode (--failure-cases): submit three deliberately-bad inputs
 // and assert the on-chain error codes match errors.rs.
