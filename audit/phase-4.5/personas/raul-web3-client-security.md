@@ -1,8 +1,8 @@
-# Raul Mendoza — Web3 Client-Side Security Audit of `@alea/sdk` v0.1.0
+# Raul Mendoza — Web3 Client-Side Security Audit of `@alea-drand/sdk` v0.1.0
 
 **Persona:** 6y appsec, wallet/dApp focus. 12 CVEs in Solana SDK ecosystem: keypair-in-stacktrace, no-timeout-fetch slow-loris, unsafe JSON.parse, seed-in-error-message, `Buffer.from(untrusted,'hex')` poisoning, wallet-adapter shape confusion.
 
-**Scope:** `/Users/aaron/dev/work/alea/sdk/typescript/` + `README.md` + `CHANGELOG.md` + `LICENSE`. No Rust, no program, no CI.
+**Scope:** `sdk/typescript/` + `README.md` + `CHANGELOG.md` + `LICENSE`. No Rust, no program, no CI.
 
 **Threat model:** every external byte is hostile — drand API, signer object, RPC endpoint, user-supplied round. Looking for: injection, unvalidated deserialization, proto pollution, exception DoS, log/error leakage of secrets, timing oracles, unbounded retries, wallet phishing.
 

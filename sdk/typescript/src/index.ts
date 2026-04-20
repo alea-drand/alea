@@ -1,4 +1,4 @@
-// @alea/sdk — public API surface per T2.Q
+// @alea-drand/sdk — public API surface
 
 export { getVerifiedRandomness, verifyDrandBeacon } from "./client.js";
 export { fetchBeacon, getCurrentRound, getRoundAt, isRoundRecent } from "./drand.js";

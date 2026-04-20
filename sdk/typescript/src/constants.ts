@@ -20,10 +20,10 @@ export const DRAND_ENDPOINTS: readonly string[] = [
 // choose to run on. Your Connection object determines which cluster's
 // deployment the tx actually lands against.
 //
-// As of v0.1.0: Alea is live on DEVNET only. Mainnet deploy is the
-// Phase 5 gate. If you point a mainnet Connection at the SDK today,
-// the tx will fail at the Solana RPC layer with "Program not found"
-// (or similar) — Solana itself is the safety rail, not the SDK.
+// As of v0.1.0: Alea is live on DEVNET only. Mainnet deploy is
+// pending. If you point a mainnet Connection at the SDK today, the
+// tx will fail at the Solana RPC layer with "Program not found" (or
+// similar) — Solana itself is the safety rail, not the SDK.
 //
 // DEVNET_PROGRAM_ID and MAINNET_PROGRAM_ID are exposed as distinct
 // symbols for clarity-of-intent in consumer code (`programId: MAINNET_

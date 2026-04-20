@@ -78,10 +78,10 @@
 //! | Cluster | Program ID |
 //! |---------|-----------|
 //! | Devnet  | `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U` |
-//! | Mainnet | Pending Phase 5 (same vanity ID — cluster binding is identical) |
+//! | Mainnet | Pending (same vanity ID — cluster binding is identical) |
 //!
-//! Devnet-verified; mainnet deployment pending Phase 5. Cluster binding
-//! identical (vanity ID usable on both), mainnet traffic begins Phase 5.
+//! Devnet-verified; mainnet deployment pending. Cluster binding identical
+//! (vanity ID usable on both).
 //!
 //! ## Maturity
 //!
@@ -110,8 +110,8 @@ use anchor_lang::solana_program::sysvar::clock::Clock;
 /// mainnet deployment per ADR 0028. Same ID used across localnet / devnet
 /// / mainnet by design — consumer SDKs do not need to branch per cluster.
 ///
-/// Devnet-verified; mainnet deployment pending Phase 5. Cluster binding
-/// identical (vanity ID usable on both), mainnet traffic begins Phase 5.
+/// Devnet-verified; mainnet deployment pending. Cluster binding identical
+/// (vanity ID usable on both).
 ///
 /// This re-exports the verifier crate's `declare_id!`-generated `ID`
 /// constant, which guarantees the SDK's PROGRAM_ID can never drift from
