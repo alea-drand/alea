@@ -134,7 +134,7 @@ jobs:
         run: npm publish --access public --provenance
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # T2.CC — no auto-generated notes; CHANGELOG.md is canonical.
           body_path: CHANGELOG.md
