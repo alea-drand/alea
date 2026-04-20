@@ -1,6 +1,6 @@
 # Alea
 
-On-chain [drand](https://drand.love) BN254 verifier for Solana. Apache 2.0, free public good.
+On-chain drand randomness verification for Solana. No oracle, no callback — one CPI call, 32 bytes of verified randomness.
 
 [![CI](https://github.com/alea-drand/alea/actions/workflows/test.yml/badge.svg)](https://github.com/alea-drand/alea/actions/workflows/test.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -8,131 +8,28 @@ On-chain [drand](https://drand.love) BN254 verifier for Solana. Apache 2.0, free
 [![npm](https://img.shields.io/npm/v/@alea-drand/sdk.svg)](https://www.npmjs.com/package/@alea-drand/sdk)
 [![drand](https://img.shields.io/badge/powered%20by-drand-ff6b6b.svg)](https://drand.love)
 
-Any Solana program can call `alea_sdk::cpi::verify(program, config, payer, round, signature)` and get 32 bytes of cryptographically verified randomness in a single transaction — no callbacks, no keepers, no off-chain coordinators, no protocol fees.
-
----
-
-## Table of Contents
-
-- [What Alea Is](#what-alea-is)
-- [Why Alea](#why-alea)
-- [Status](#status)
-- [Use Cases](#use-cases)
-- [Quick Start](#quick-start)
-- [How It Works](#how-it-works)
-- [Architecture](#architecture)
-- [Packages](#packages)
-- [API Reference](#api-reference)
-- [Program Addresses](#program-addresses)
-- [Error Codes](#error-codes)
-- [Security](#security)
-- [Testing & Validation](#testing--validation)
-- [Upgrade Authority](#upgrade-authority)
-- [FAQ](#faq)
-- [Prior Art & Credits](#prior-art--credits)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
-## What Alea Is
-
-Alea verifies randomness beacons from [drand](https://drand.love) — the League of Entropy's threshold-signed public randomness network — directly on-chain using Solana's `alt_bn128_pairing` syscall.
-
-- **drand** is a decentralized network run by the League of Entropy (a coalition of universities, companies, and non-profits including Cloudflare, Protocol Labs, EPFL and others) that jointly produces a publicly verifiable randomness beacon every 3 seconds using BLS threshold signatures on the BN254 curve.
-- **Alea** verifies those beacons on-chain through full BN254 pairing math. If the pairing check passes, the signature is authentic and the 32 bytes returned are the canonical randomness for that round.
-- **The output is deterministic**: any two consumers verifying the same round get the same 32 bytes. This makes Alea well-suited for public-draw semantics (lotteries, tournaments, fair launches) and poorly suited for per-request unique-seed VRF (see the [FAQ](#faq) for per-caller randomness derivation).
-- **It is stateless**: Alea doesn't store beacons. Each `verify` call takes the round number and signature from the caller, checks the pairing, and returns randomness. A single on-chain `Config` PDA holds the drand public key + chain hash — read-only during verification.
-
-This is not a VRF service in the ORAO/Switchboard sense (per-request oracle). It's closer in spirit to a verifiable public-randomness oracle — cryptographically auditable on-chain rather than oracle-attested.
-
----
-
-## Why Alea
-
-| Existing option | Cost per call | Friction | Provenance | Trust model |
-|-----------------|---------------|----------|------------|-------------|
-| [ORAO VRF](https://orao.network) | ~$0.15 | Request-then-callback (2 tx) | Single-operator attestation | Trust the operator |
-| [Switchboard](https://switchboard.xyz) randomness | ~$0.01+ | Oracle round trip | Oracle committee attestation | Trust the committee |
-| [MagicBlock VRF](https://docs.magicblock.gg) | Not publicly disclosed | Request-then-callback (2 tx) | Program-signed callback | Trust the VRF operator |
-| Commit-reveal (DIY) | 0 | 2 tx + coordinator logic | No cryptographic provenance | Trust your own coordinator |
-| **Alea** | **$0** (~0.000005 SOL tx fee) | **1 CPI call, single tx** | **drand threshold sig, verified on-chain via BN254 BLS** | **Trust drand's League-of-Entropy threshold** |
-
-The other options are oracle-based: a designated operator or committee produces the randomness and attests to it, and consumers trust that attestation. Alea has no operator — the randomness is the drand beacon itself, and Solana verifies the BN254 pairing on-chain before returning the bytes. The trust surface is drand's threshold-signer set, not an intermediate oracle.
-
-The trade-off: Alea doesn't give you per-caller unique randomness without consumer-side derivation (see [FAQ](#faq)). For public-draw semantics, that's a feature — multiple consumers watching the same round arrive at the same bytes independently, so the draw is auditable by anyone.
-
----
-
-## Status
-
-- **Devnet:** Live at program `ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U`. Verified end-to-end against live drand rounds.
-- **Mainnet:** Same vanity program ID (cluster-agnostic — the same bytes deploy on both clusters). If mainnet isn't yet live when you read this, a mainnet `Connection` fails at the Solana RPC layer with "program not found"; this README will be updated when mainnet deployment completes.
-- **Published SDKs:**
-  - [`alea-verifier v0.1.0`](https://crates.io/crates/alea-verifier) on crates.io
-  - [`alea-sdk v0.1.0`](https://crates.io/crates/alea-sdk) on crates.io
-  - [`@alea-drand/sdk v0.1.0`](https://www.npmjs.com/package/@alea-drand/sdk) on npm
-
-Read [CHANGELOG.md](CHANGELOG.md) for release notes and [`sdk/rust/CAVEATS.md`](sdk/rust/CAVEATS.md) + [`sdk/typescript/CAVEATS.md`](sdk/typescript/CAVEATS.md) for maturity disclosures before integrating in production.
-
----
-
-## Use Cases
-
-**Good fit:**
-- Lotteries and raffles where everyone sees the same draw
-- Tournament brackets and seeding (public, auditable)
-- On-chain games with public-draw semantics (slots, dice, card games with open outcomes)
-- Fair launch and mint-order randomization
-- Governance sortition (picking N delegates from M candidates)
-- NFT trait reveal with provable fairness
-
-**Needs consumer-side derivation** (see [FAQ](#faq) for the `per_user = sha256(round_randomness || user_pubkey)` pattern):
-- Per-user unique randomness
-- Private-bid auctions (commit-reveal + Alea as the reveal trigger)
-
-**Not a fit:**
-- High-frequency randomness where 3-second drand rounds are too slow
-- Truly private randomness (drand beacons are public by design — consumers who know the round number learn the randomness)
-
----
-
-## Quick Start
-
-```bash
-cargo add alea-sdk
-# or: npm install @alea-drand/sdk @solana/web3.js @coral-xyz/anchor
-```
-
-### Rust CPI (on-chain composition)
-
 ```rust
 use alea_sdk::{self, AleaVerifier};
 
 #[derive(Accounts)]
 pub struct ResolveGame<'info> {
-    pub alea_program: Program<'info, alea_sdk::AleaVerifier>,
+    pub alea_program: Program<'info, AleaVerifier>,
     #[account(
         seeds = [b"config"],
         bump,
-        seeds::program = alea_program.key(),  // MANDATORY (fake-config guard)
+        seeds::program = alea_program.key(),  // MANDATORY
     )]
     pub alea_config: Account<'info, alea_sdk::Config>,
     pub payer: Signer<'info>,
     pub clock: Sysvar<'info, Clock>,
-    // ... your accounts ...
 }
 
-pub fn resolve_game(ctx: Context<ResolveGame>, round: u64, signature: [u8; 64]) -> Result<()> {
-    // MANDATORY: reject stale beacons before trusting randomness
+pub fn resolve(ctx: Context<ResolveGame>, round: u64, signature: [u8; 64]) -> Result<()> {
     require!(
         alea_sdk::is_round_recent(round, &ctx.accounts.alea_config, &ctx.accounts.clock, 30),
         GameError::StaleBeacon,
     );
 
-    // One-line CPI. Returns VerifiedRandomness (must_use wrapper so a
-    // forgotten `.into_inner()` produces a compile warning rather than
-    // silently dropping the 32 bytes).
     let randomness = alea_sdk::cpi::verify(
         ctx.accounts.alea_program.to_account_info(),
         ctx.accounts.alea_config.to_account_info(),
@@ -141,66 +38,32 @@ pub fn resolve_game(ctx: Context<ResolveGame>, round: u64, signature: [u8; 64]) 
         signature,
     )?.into_inner();
 
-    // Use the 32-byte randomness. Capture BEFORE any subsequent CPI —
-    // Solana's return-data slot is single-use.
-    let winner_index = u64::from_le_bytes(randomness[0..8].try_into().unwrap()) % 2;
-    // ... settle logic ...
-
+    // Use randomness immediately. The next CPI overwrites Solana's return slot.
+    let winner = u64::from_le_bytes(randomness[0..8].try_into().unwrap()) % 2;
+    // ...
     Ok(())
 }
 ```
 
-**Mandatory consumer constraints** (omitting either ships an exploitable program):
+## Why
 
-1. **`seeds::program = alea_program.key()`** on the `alea_config` account — prevents fake-config substitution attacks where an attacker passes a PDA owned by their own program with attacker-chosen public keys.
-2. **`is_round_recent(round, config, clock, max_age)`** before trusting randomness — prevents replay of old drand rounds whose randomness is publicly known.
+Every other randomness option on Solana asks you to trust somebody. ORAO wants you to trust its operator quorum. Switchboard v2 wants you to trust its oracle committee; v3 wants you to trust Intel SGX enclaves. MagicBlock wants you to trust its committee. Pyth Entropy is EVM-only and wants you to trust the Pyth provider anyway. Commit-reveal DIY wants you to trust your own coordinator not to front-run you.
 
-Both are documented in [`sdk/rust/README.md`](sdk/rust/README.md) §Security and demonstrated in the canonical [`programs/example-lottery/`](programs/example-lottery/).
+Alea is different because there's no operator to trust. The randomness IS the drand beacon — threshold-signed by Cloudflare, Protocol Labs, EPFL, Kudelski Security, and other members of the League of Entropy — and the BN254 BLS signature is verified on-chain via `alt_bn128_pairing`. If the pairing check passes, the 32 bytes are authentic. The trust surface is drand's threshold signer set. That's it.
 
-### TypeScript / Node (off-chain fetch + submit)
+drand beacons are public. Everyone resolving against the same round gets the same 32 bytes — a feature for public-draw semantics (lotteries, tournaments, fair launches) and a limitation if you want per-user unique randomness. Derive that yourself with `sha256(round_randomness || user_pubkey)`, or use ORAO — that's what it's for.
 
-```typescript
-import { getVerifiedRandomness } from "@alea-drand/sdk";
-import { Connection, Keypair } from "@solana/web3.js";
+## How it works
 
-const connection = new Connection("https://api.devnet.solana.com", "confirmed");
-const signer = Keypair.fromSecretKey(/* your keypair bytes */);
+1. Your program calls `alea_sdk::cpi::verify(program, config, payer, round, signature)`.
+2. Alea computes `msg_hash = keccak256(round_be_u64)`.
+3. Full SVDW hash-to-curve maps `msg_hash` into a G1 point `M`. This is the hot path at roughly 250–400K CU.
+4. Alea calls `alt_bn128_pairing` to check `e(σ, G2_gen) == e(M, pubkey_G2)`. Pairing costs about 48K CU.
+5. On success Alea returns `sha256(signature)` as 32 bytes. That matches drand's published `randomness` field byte-for-byte under the `bls-bn254-unchained-on-g1` scheme.
 
-// One-liner: fetches the latest drand beacon, submits verify tx, returns 32 bytes.
-const randomness: Uint8Array = await getVerifiedRandomness({
-  connection,
-  signer,
-  // round defaults to latest drand round — pass a bigint to pin a specific one
-});
+No hinting, no coordinator, no off-chain step. The entire verification happens inside the transaction.
 
-console.log("Verified randomness (hex):", Buffer.from(randomness).toString("hex"));
-```
-
-Browser (Vite / webpack / Next.js App Router / esbuild) works out of the box — no `fs` polyfills, zero Node-only imports in the published bundle. See [`sdk/typescript/README.md`](sdk/typescript/README.md) for wallet-adapter integration + the browser quick-start.
-
-The SDK's program ID is cluster-agnostic — `DEVNET_PROGRAM_ID` and `MAINNET_PROGRAM_ID` point to the same bytes. Your `Connection` object selects the cluster. Use the devnet RPC URL to test against the devnet deployment; use a mainnet RPC URL to call the mainnet deployment.
-
----
-
-## How It Works
-
-1. **Your program or app calls** `alea_sdk::cpi::verify(program, config, payer, round, signature)` (Rust on-chain) or `getVerifiedRandomness({ connection, signer })` (TypeScript off-chain → Solana tx).
-2. **Alea's on-chain program computes** `msg_hash = keccak256(round_be_u64)`.
-3. **Alea runs full SVDW hash-to-curve** (Shallue–van de Woestijne) on Solana BPF to map `msg_hash` into a G1 point `M ∈ BN254_G1`. This is the critical path: ~250–400K compute units.
-4. **Alea invokes Solana's `alt_bn128_pairing` syscall** to verify `e(σ, G2_gen) == e(M, pubkey_G2)` where:
-   - `σ` is the caller-supplied 64-byte signature (drand beacon)
-   - `pubkey_G2` is drand's public key, stored in the `Config` PDA
-   - `G2_gen` is BN254's generator
-   - Pairing check costs ~48K CU
-5. **On success**, Alea returns `sha256(signature_bytes)` as 32 bytes — matches drand's published `randomness` field byte-for-byte (drand's `bls-bn254-unchained-on-g1` scheme).
-
-No off-chain steps. No hinting. No trusted coordinator. Pure cryptographic verification.
-
-### Total compute budget
-
-Alea verify consumes **up to ~454K CU** worst-case. Solana's default per-instruction budget is 200K, so **every transaction calling Alea MUST include** `ComputeBudgetInstruction::set_compute_unit_limit(900_000)`. The TypeScript SDK injects this automatically. Rust consumers building raw transactions must add it manually.
-
----
+Worst-case compute is about 454K CU, so every transaction calling Alea MUST include `ComputeBudgetInstruction::set_compute_unit_limit(900_000)`. The TypeScript SDK injects this automatically. Rust callers building raw transactions have to add it themselves.
 
 ## Architecture
 
@@ -215,9 +78,6 @@ Alea verify consumes **up to ~454K CU** worst-case. Solana's default per-instruc
 │                      Your application                           │
 │                                                                 │
 │  @alea-drand/sdk (TypeScript)  OR  alea-sdk (Rust CPI)          │
-│    ├─ fetch drand beacon           ├─ require!(is_round_recent) │
-│    ├─ inject ComputeBudget 900K    ├─ alea_sdk::cpi::verify()   │
-│    └─ sign + sendRawTransaction    └─ capture randomness        │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             │ Solana RPC → tx
@@ -231,224 +91,59 @@ Alea verify consumes **up to ~454K CU** worst-case. Solana's default per-instruc
 │  4. alt_bn128_pairing([σ, G2_gen, -M, pubkey_g2]) == 1  [~48K]  │
 │  5. Emit BeaconVerified event, return sha256(signature)         │
 └─────────────────────────────────────────────────────────────────┘
-                            │
-                            │ return data = 32 bytes
-                            ▼
-                  Consumer program uses randomness
-                  (must capture before any other CPI)
 ```
 
-**Stateless design**: one Config PDA (`seeds = [b"config"]`) holds drand's G2 public key, chain_hash, genesis_time, and period. No beacon storage, no request/response cycle, no off-chain coordinator.
+One Config PDA (`seeds = [b"config"]`) holds drand's public key, chain hash, genesis time, and period. No beacon storage, no request/response cycle.
 
----
+## Mandatory consumer constraints
 
-## Packages
+The constraints look pedantic because they are. Fake-config substitution and beacon replay are both silent compromises of your randomness source — they won't throw an error, they'll just return something an attacker controls.
 
-| Package | Registry | Purpose | Size |
-|---------|----------|---------|------|
-| [`alea-verifier`](https://crates.io/crates/alea-verifier) | crates.io | On-chain Anchor program, imported as library | ~180 KB BPF .so |
-| [`alea-sdk`](https://crates.io/crates/alea-sdk) | crates.io | Rust CPI helper for consumer programs | thin wrapper |
-| [`@alea-drand/sdk`](https://www.npmjs.com/package/@alea-drand/sdk) | npm | TypeScript SDK: fetch drand + submit verify tx | 27.9 KB packed, 98.2 KB unpacked, ESM-only |
+1. `seeds::program = alea_program.key()` on the `alea_config` account. Without it, an attacker can pass a PDA owned by their own program with attacker-chosen public keys. Anchor does not enforce program-ownership on PDA accounts by default; the account constraint will accept anything matching the seed pattern.
 
-All three pinned to the same v0.1.0.
+2. `is_round_recent(round, config, clock, max_age_seconds)` before trusting randomness. Alea's `verify` instruction accepts any round, including old ones whose randomness is already public. 30 seconds is a reasonable default; tighten to 3 (one drand round) for adversarial contexts.
 
----
+3. Capture the return data immediately. Solana's return-data slot is single-use — the next CPI overwrites it. Read the randomness into a local variable before any token transfer or other CPI, or you'll read stale bytes.
 
-## API Reference
+`alea_sdk::cpi::verify` also asserts `config.owner == PROGRAM_ID` at the wrapper layer (about 200 CU). That catches non-Anchor callers who bypass the `seeds::program` check — defense-in-depth, not a replacement for the constraint.
 
-### Rust (`alea-sdk`)
+The canonical [`programs/example-lottery/`](programs/example-lottery/) demonstrates all three with commit-reveal.
 
-```rust
-// Types
-pub struct AleaVerifier;               // Program type: Program<'info, AleaVerifier>
-pub struct Config { ... };             // Config PDA state (re-exported from alea-verifier)
-pub enum AleaError { ... };            // 6000–6012 error codes (see below)
-pub struct VerifiedRandomness([u8; 32]);  // #[must_use] wrapper — can't silently drop
+## What it's not for
 
-// Constants
-pub const PROGRAM_ID: Pubkey;          // ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U
+Three-second drand periods put Alea out of reach for anything needing sub-second response. And because drand beacons are public the moment they publish, Alea is the reveal trigger for sealed-bid auctions, not the private source of the sealed values.
 
-// Functions
-pub fn config_pda(program_id: &Pubkey) -> (Pubkey, u8);
-pub fn is_round_recent(
-    round: u64,
-    config: &Config,
-    clock: &Clock,
-    max_age_seconds: u64,
-) -> bool;
+## Status
 
-// CPI module
-pub mod cpi {
-    pub fn verify<'info>(
-        alea_program: AccountInfo<'info>,
-        config: AccountInfo<'info>,
-        payer: AccountInfo<'info>,
-        round: u64,
-        signature: [u8; 64],
-    ) -> Result<VerifiedRandomness>;
-}
+Devnet is live at [`ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U`](https://explorer.solana.com/address/ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U?cluster=devnet). The program is cluster-agnostic — the same vanity ID will deploy to mainnet unchanged. Mainnet deployment is pending; a mainnet Connection fails at the Solana RPC layer ("program not found") until then.
+
+The program is upgradeable by a single deployer keypair today. Migration to a Squads 2-of-3 multisig is planned after mainnet stabilises; the long-term intent is to zero out the upgrade authority once the program has run without critical bugs for a meaningful period. The on-chain `verify` interface is frozen — instruction signature, Config layout, return-data format, and event schema don't change across upgrades. Breaking changes would require a new program ID. CI enforces this via `idl-diff` on every PR.
+
+Alea is solo-maintained and grant-unfunded. Issues and PRs get answered when I see them — usually same-day, not guaranteed. Read [`sdk/rust/CAVEATS.md`](sdk/rust/CAVEATS.md) and [`sdk/typescript/CAVEATS.md`](sdk/typescript/CAVEATS.md) before integrating in production.
+
+## Install
+
+```bash
+cargo add alea-sdk
+# or: npm install @alea-drand/sdk @solana/web3.js @coral-xyz/anchor
 ```
 
-### TypeScript (`@alea-drand/sdk`)
+Three packages, all v0.1.0: [`alea-verifier`](https://crates.io/crates/alea-verifier) (the on-chain program, importable as a library), [`alea-sdk`](https://crates.io/crates/alea-sdk) (Rust CPI helpers), and [`@alea-drand/sdk`](https://www.npmjs.com/package/@alea-drand/sdk) (TypeScript client for off-chain fetch-and-submit). The full API lives in [`sdk/rust/README.md`](sdk/rust/README.md) and [`sdk/typescript/README.md`](sdk/typescript/README.md).
 
-```typescript
-// High-level entry point
-getVerifiedRandomness(options: {
-  connection: Connection;
-  signer: Keypair | Wallet;
-  programId?: PublicKey;                // defaults to DEVNET_PROGRAM_ID
-  round?: bigint;                       // defaults to latest drand round
-  computeUnits?: number;                // defaults to 900_000
-  signal?: AbortSignal;                 // cancel mid-fetch or pre-broadcast
-  skipPreflight?: boolean;              // default true (required for pairing CU)
-}): Promise<Uint8Array>;
+Devnet addresses: Config PDA is `6anALRxD98Tw7zbA9d5i4NJfTvxDsNBHohHVJWxv2Xm8`; upgrade authority is `9cPWdtoR7sW7VVYxfrJZ9ekxX2fZctskXn3L4BSmafcc`; the deployed binary's SHA256 is `8965062489fdcdbb538597545fc6692f3f580d770d34f2d42000a70560984b1c`.
 
-// Lower-level
-verifyDrandBeacon(args): Promise<Uint8Array>;
-fetchBeacon(round?, { signal? }): Promise<DrandBeacon>;
-createVerifyInstruction({ round, signature, payer, programId? }): TransactionInstruction;
-
-// Pure helpers
-getCurrentRound(): bigint;
-getRoundAt(timestamp: bigint): bigint;
-isRoundRecent(round, config, clock, maxAgeSeconds): boolean;
-getConfigAddress(programId?): PublicKey;
-
-// Constants + errors
-DRAND_CHAIN_HASH, DRAND_GENESIS_TIME, DRAND_PERIOD, DRAND_ENDPOINTS;
-DEVNET_PROGRAM_ID, MAINNET_PROGRAM_ID;  // same bytes; cluster picked via Connection
-AleaError, ERRORS;
-```
-
-See [`sdk/typescript/README.md`](sdk/typescript/README.md) for complete signatures + usage examples.
-
----
-
-## Program Addresses
-
-| Item | Value |
-|------|-------|
-| Program ID (all clusters) | [`ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U`](https://explorer.solana.com/address/ALEAydzHd4cN2EWcdHKp4hehAE4B88b16gqVtVqsck2U?cluster=devnet) |
-| Config PDA (devnet) | `6anALRxD98Tw7zbA9d5i4NJfTvxDsNBHohHVJWxv2Xm8` |
-| Upgrade authority | `9cPWdtoR7sW7VVYxfrJZ9ekxX2fZctskXn3L4BSmafcc` (single deployer keypair — see [Upgrade Authority](#upgrade-authority)) |
-| Binary SHA256 (devnet) | `8965062489fdcdbb538597545fc6692f3f580d770d34f2d42000a70560984b1c` |
-
----
-
-## Error Codes
-
-Canonical source: [`programs/alea-verifier/src/errors.rs`](programs/alea-verifier/src/errors.rs). CI enforces `idl-diff` to prevent silent schema drift.
-
-| Code | Name | Meaning | Retryable? |
-|------|------|---------|------------|
-| 2001 | `ConstraintHasOne` (Anchor) | `update_config` signer not config authority | No |
-| 3010 | `AccountNotSigner` (Anchor) | `authority` passed without signature | No |
-| 6000 | `InvalidSignature` | BLS pairing check failed for this (round, sig) | No |
-| 6001 | `InvalidG1Point` | Signature bytes not on BN254 G1 curve | No |
-| 6002 | `RoundZero` | Round 0 forbidden (drand sentinel) | No |
-| 6003 | `InvalidFieldElement` | Reserved — unreachable in v1 | No |
-| 6004 | `NoSquareRoot` | SVDW exhausted candidates (infra failure) | No |
-| 6005 | `InvalidG2Point` | Reserved — unreachable under current config fallback | No |
-| 6006 | `PairingError` | `alt_bn128_pairing` syscall failed (infra) | No |
-| 6007 | `WrongChainHash` | Config.chain_hash ≠ evmnet (wrong-chain deploy) | No |
-| 6008 | `WrongPubkey` | Config.pubkey_g2 ≠ evmnet; also emitted by SDK's CPI owner check | No |
-| 6009 | `ReturnDataMissing` | Reserved — unreachable under current CPI return pattern | No |
-| 6010 | `InvalidGenesisTime` | Config.genesis_time ≠ evmnet | No |
-| 6011 | `InvalidPeriod` | Config.period ≠ evmnet | No |
-| 6012 | `UnauthorizedInit` | `initialize` signer ≠ program upgrade authority | No |
-| 6100 (SDK) | `DrandFetchFailed` | All drand endpoints failed after retries | Yes — transient network |
-| 6101 (SDK) | `DrandRoundMismatch` | Endpoint returned different round than requested | Yes — try next endpoint |
-| 6102 (SDK) | `InvalidInput` | SDK-level input validation (bad hex, wrong sig length, etc.) | No |
-| 6103 (SDK) | `Aborted` | Caller AbortSignal fired pre-broadcast | No |
-
----
+Error codes are canonical in [`programs/alea-verifier/src/errors.rs`](programs/alea-verifier/src/errors.rs). CI's `idl-diff` check prevents silent schema drift. Codes 6000–6012 are on-chain; 6100–6103 are TypeScript-SDK-side (network failures and input validation).
 
 ## Security
 
-- **Report vulnerabilities:** [GitHub Security Advisory](https://github.com/alea-drand/alea/security/advisories/new) (preferred) or `security@alea.so` (fallback — mail server provisioning pending; use GitHub until then). Response is best-effort within a few days for P0 issues. See [`.github/SECURITY.md`](.github/SECURITY.md) for full policy, scope, and disclosure timeline.
-- **Mandatory consumer constraints** (omitting either ships an exploitable program):
-  1. `seeds::program = alea_program.key()` on the Config PDA — fake-config defense
-  2. `is_round_recent()` before trusting randomness — anti-replay
-  3. Capture return data immediately — Solana's return-data slot is single-use
-- **Defense-in-depth**: `alea_sdk::cpi::verify()` also asserts `config.owner == PROGRAM_ID` at the wrapper layer (~200 CU) — catches non-Anchor callers who bypass the `seeds::program` check.
-- **Supply chain**: `cargo-deny` (licenses + advisories + bans + sources) + `npm audit` + `trufflehog` secret-scan run on every PR and weekly cron. Published npm tarballs carry Sigstore provenance attestations.
+Report vulnerabilities via [GitHub Security Advisory](https://github.com/alea-drand/alea/security/advisories/new). Scope and disclosure timeline in [`.github/SECURITY.md`](.github/SECURITY.md). Alea holds no user funds, so the attack surface is binary replacement of the on-chain program — consumers wanting belt-and-suspenders protection can pin against the published binary SHA256 above and refuse to transact if the deployed binary changes unexpectedly.
 
----
+70+ Rust and 37+ TypeScript tests run on every PR. 23 billion cargo-fuzz iterations across the cryptographic pipeline, zero crashes — proof tarballs on [the latest release](https://github.com/alea-drand/alea/releases). Supply chain covered by `cargo-deny`, `npm audit`, and `trufflehog` secret-scan on every PR plus a weekly cron.
 
-## Testing & Validation
+## Credits
 
-**Unit + integration tests:** 70+ Rust unit/integration tests covering SVDW hash-to-curve, G1/G2 on-curve checks, pairing verification, `is_round_recent` boundary cases, and PDA derivation. 37+ TypeScript unit tests covering the drand client, instruction builder, error extraction, and input validation. Full suite runs in CI on every PR.
+[randa-mu/bls-solana](https://github.com/randa-mu/bls-solana) — Randamu, the organization that operates drand, built a BN254 verifier prototype for Solana. It was never deployed to any cluster. Alea completes the work; randa-mu defined the shape of the problem. [kevincharm/bls-bn254](https://github.com/kevincharm/bls-bn254) is the Solidity reference — SVDW and BN254 constants are ported from there, cross-validated against gnark-crypto. [drand and the League of Entropy](https://drand.love) produce the beacon Alea verifies. [Paul Miller's noble libraries](https://paulmillr.com/noble/) generated test vectors. The [arkworks ecosystem](https://arkworks.rs) underpins the field arithmetic.
 
-**Live devnet integration:** end-to-end verification against live drand rounds on devnet (gated behind explicit opt-in via `cargo test -- --ignored`). Fixture-based regressions on canonical round-1 + round-9337227 beacons.
+## License & Contributing
 
-**Fuzzing** — 5 parallel cargo-fuzz targets covering the full cryptographic pipeline:
-
-| Target | Coverage |
-|--------|----------|
-| `verify_beacon` | end-to-end verify (round + signature → randomness) |
-| `hash_to_g1` | full SVDW hash-to-curve |
-| `on_curve_g1` | G1 on-curve validation |
-| `hash_to_field_canonicity` | Fq field-element canonicity |
-| `pairing_buffer_parses` | pairing input deserialization |
-
-Final campaign (April 2026): **22.05 billion iterations across all 5 targets in 13 hours wall time with 0 crashes, 0 memory errors, 0 timeouts** (libFuzzer `-fork=3` per target on 18-core hardware). An earlier corpus-seeded pilot added 1.77 billion iterations across the three original targets — combined total **23.82 billion iterations**. Proof tarballs (per-target coverage HTML + metadata + SHA256 sums) are attached to the [`v0.2.0-audit-passed`](https://github.com/alea-drand/alea/releases/tag/v0.2.0-audit-passed) GitHub release.
-
-**Supply chain:** `cargo-deny` (licenses + advisories + bans + sources) + `npm audit` + `trufflehog` secret-scan run on every PR and weekly cron.
-
----
-
-## Upgrade Authority
-
-The `alea-verifier` program is currently upgradeable, controlled by a single deployer keypair. Migration to a Squads 2-of-3 multisig is planned after mainnet stabilises. The long-term intent is to zero out the upgrade authority entirely once the program has operated without critical bugs for a meaningful period.
-
-The on-chain `verify` interface itself is stable: the instruction signature, `Config` account layout, `Verify` accounts struct, return-data format, and `BeaconVerified` event schema are not changed by upgrades. Additive changes (new instructions) can happen at minor versions; breaking changes would require a new program ID. CI enforces this via the `idl-diff` check on every PR.
-
-Alea holds no user funds on-chain — there's no TVL surface for an authority compromise to attack. The risk is binary replacement of the program binary with a malicious version; consumers who want belt-and-suspenders protection can pin against the published binary SHA256 (see [Program Addresses](#program-addresses)) and refuse to interact if the deployed binary changes unexpectedly.
-
----
-
-## FAQ
-
-**Is this a VRF?**
-Not in the classical (per-request-unique) sense. Alea verifies a *public* randomness beacon: everyone resolving against the same drand round gets the same 32 bytes. If you need per-caller unique randomness, derive it consumer-side: `per_caller = sha256(round_randomness || caller_pubkey)`.
-
-**Why drand and not chain-native randomness (slot hashes, recent_blockhashes)?**
-Chain-native sources are grindable or biased by the proposer. drand is threshold-signed by the League of Entropy coalition, so biasing it requires compromising a threshold-sized fraction of the signers — a meaningfully different trust model.
-
-**Why BN254 and not BLS12-381?**
-drand supports multiple curves; their `evmnet` chain uses BN254 specifically so Ethereum + Solana (both of which expose BN254 via precompiles/syscalls) can verify cheaply. The `alt_bn128_pairing` syscall is Alea's critical dependency.
-
-**What happens if drand gets compromised?**
-drand is threshold-signed: forging a beacon requires compromising more than half the signer set. Compromise of a minority of signers doesn't forge anything. In the catastrophic case where a forged beacon does get produced, Alea's verification still rejects anything that fails the pairing check (error 6000) — consumers see a failed transaction, not silent corruption.
-
-**What about front-running?**
-drand beacons are public the moment they're published. To prevent front-running in a commit-reveal pattern, consumers enforce `min_resolution_round ≥ current_round + 1` at commit time — the canonical [`example-lottery`](programs/example-lottery/) demonstrates this.
-
-**How much does a verify cost?**
-Zero protocol fees. Zero oracle fees. You pay Solana's base transaction fee (~5000 lamports = $0.0005 at SOL=$100) plus the compute budget cost (~0.00005 SOL at 900K CU with default priority). No recurring subscription.
-
----
-
-## Prior Art & Credits
-
-- **[randa-mu/bls-solana](https://github.com/randa-mu/bls-solana)** — Randamu (the organization that operates drand) built a BN254 drand verifier prototype for Solana. Never deployed to any Solana cluster (verified via RPC across mainnet/devnet/testnet). Alea completes the job; randa-mu taught us the shape of the problem.
-- **[kevincharm/bls-bn254](https://github.com/kevincharm/bls-bn254)** — Solidity reference implementation. SVDW algorithm and BN254 constants ported from here + cross-validated against gnark-crypto.
-- **[drand / League of Entropy](https://drand.love)** — the coalition of universities, companies, and non-profits that jointly produces the drand randomness beacon Alea verifies.
-- **[Paul Miller's noble libraries](https://paulmillr.com/noble/)** — `@noble/curves` + `@noble/hashes` are the JS reference implementations used for test vector generation.
-- **arkworks ecosystem** — `ark-ff`, `ark-bn254`, `ark-ec`, `ark-serialize` underpin Alea's field arithmetic.
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding conventions, and PR process.
-
-Alea is currently solo-maintained and grant-unfunded. Response times for issues and PRs are best-effort. If you need guaranteed SLAs for a commercial integration, open an issue.
-
-The `verify` v1 instruction signature is frozen. Additive changes are welcome; breaking changes would require a new program ID (new deployment, not an upgrade). CI enforces this on every PR.
-
----
-
-## License
-
-Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for third-party attributions.
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE). Development notes in [CONTRIBUTING.md](CONTRIBUTING.md).
