@@ -45,7 +45,7 @@ jobs:
         run: cargo deny --all-features check
 
   npm-audit:
-    name: npm audit (@alea/sdk runtime deps)
+    name: npm audit (@alea-drand/sdk runtime deps)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
