@@ -1,0 +1,45 @@
+name: Publish @alea-drand/sdk@0.2.0 to npm (one-off)
+
+# Disposable recovery workflow — publishes ONLY the TypeScript SDK.
+# The canonical release.yml publishes all three packages (alea-verifier,
+# alea-sdk, @alea-drand/sdk) atomically on a single `v*.*.*` tag. For
+# 0.2.0 we only need to ship the TS SDK — the Rust crates stay at 0.1.0.
+# Pushing a v0.2.0 tag through release.yml would fail at the cargo publish
+# step ("version already uploaded") before the npm step runs.
+#
+# Pattern documented at:
+#   ~/vault/80-learnings/2026-04-20-oneoff-workflow-publish-recovery.md
+#
+# AFTER SUCCESS: delete this workflow via a cleanup PR. It is disposable.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # Sigstore provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install + build + test + publish
+        working-directory: sdk/typescript
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm ci
+          npm run build
+          npm test
+          npm publish --access public --provenance
