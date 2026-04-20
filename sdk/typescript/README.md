@@ -109,6 +109,50 @@ async function verifyDrandBeacon(args: {
 }): Promise<Uint8Array>             // 32 bytes
 ```
 
+### `verifyDrandBeaconWithMeta(args)` — since 0.2.0
+
+Same as `verifyDrandBeacon` but returns the full tx metadata alongside the randomness. Use when you need to link to Explorer, report compute units / fees, or surface the slot to end users.
+
+```typescript
+type VerifyMeta = {
+  randomness: Uint8Array;           // 32 bytes
+  tx: string;                       // base58 Solana tx signature
+  slot: number;                     // confirmed-commitment slot
+  computeUnitsUsed: number;         // from tx meta.computeUnitsConsumed
+  costLamports: number;             // from tx meta.fee
+};
+
+async function verifyDrandBeaconWithMeta(args: {
+  connection: Connection;
+  signer: Keypair | Wallet;
+  round: bigint;
+  signature: Uint8Array;
+  programId?: PublicKey;
+  computeUnits?: number;
+  signal?: AbortSignal;
+  skipPreflight?: boolean;
+}): Promise<VerifyMeta>
+```
+
+### `getVerifiedRandomnessWithMeta(options)` — since 0.2.0
+
+One-shot variant of `getVerifiedRandomness` that returns the drand round + drand signature + full on-chain meta in a single call. Used by the [alea.so](https://alea.so) public relayer; useful anywhere you want to display end-to-end provenance.
+
+```typescript
+async function getVerifiedRandomnessWithMeta(options: {
+  connection: Connection;
+  signer: Keypair | Wallet;
+  programId?: PublicKey;
+  round?: bigint;
+  computeUnits?: number;
+  signal?: AbortSignal;
+  skipPreflight?: boolean;
+}): Promise<VerifyMeta & {
+  round: bigint;                    // drand round that was verified
+  signature: Uint8Array;            // drand sig (G1, 64 bytes)
+}>
+```
+
 ### `fetchBeacon(round?)`
 
 Fetches a drand beacon without Solana interaction. Uses 5-endpoint fallback with 3 retries, validates returned round matches requested.
