@@ -1,6 +1,12 @@
 // @alea-drand/sdk — public API surface
 
-export { getVerifiedRandomness, verifyDrandBeacon } from "./client.js";
+export {
+  getVerifiedRandomness,
+  getVerifiedRandomnessWithMeta,
+  verifyDrandBeacon,
+  verifyDrandBeaconWithMeta,
+} from "./client.js";
+export type { VerifyMeta } from "./client.js";
 export { fetchBeacon, getCurrentRound, getRoundAt, isRoundRecent } from "./drand.js";
 export { createVerifyInstruction, getConfigAddress } from "./instruction.js";
 export {

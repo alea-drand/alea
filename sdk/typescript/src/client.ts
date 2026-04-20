@@ -78,7 +78,35 @@ function extractErrorCode(err: unknown): number | undefined {
   return undefined;
 }
 
-export async function verifyDrandBeacon(args: {
+/**
+ * Tx metadata returned alongside the verified randomness. Populated from
+ * `getTransaction().meta` after `confirmed` commitment. Useful for
+ * consumers that need to link to Explorer, report CU usage, or compute
+ * per-call cost (e.g., the alea.so public relayer).
+ */
+export type VerifyMeta = {
+  /** 32-byte verified randomness from the program's return data. */
+  randomness: Uint8Array;
+  /** Base58 Solana tx signature. Suitable for Explorer URLs. */
+  tx: string;
+  /** Slot the tx confirmed in. */
+  slot: number;
+  /** CU consumed per `meta.computeUnitsConsumed`. 0 if unavailable. */
+  computeUnitsUsed: number;
+  /** Fee paid in lamports per `meta.fee`. 0 if unavailable. */
+  costLamports: number;
+};
+
+/**
+ * Verify a drand beacon on-chain AND return the tx metadata (sig, slot,
+ * CU, fee) alongside the randomness. Use when you need more than just
+ * the 32-byte randomness — e.g., to show the verification tx on
+ * Explorer, or to report compute/cost to end users.
+ *
+ * Same signature as `verifyDrandBeacon`; only the return shape differs.
+ * Added in 0.2.0 for the alea.so relayer use case.
+ */
+export async function verifyDrandBeaconWithMeta(args: {
   connection: Connection;
   signer: Keypair | Wallet;
   round: bigint;
@@ -100,7 +128,7 @@ export async function verifyDrandBeacon(args: {
    * window. Default stays `true`.
    */
   skipPreflight?: boolean;
-}): Promise<Uint8Array> {
+}): Promise<VerifyMeta> {
   // Phase 4.5 input validation (T1-04, T1-05, T1-06): defensive checks at
   // the SDK boundary so consumers get readable AleaError instead of opaque
   // Node/web3.js failures downstream.
@@ -286,7 +314,32 @@ export async function verifyDrandBeacon(args: {
     );
   }
 
-  return new Uint8Array(decoded.slice(0, 32));
+  return {
+    randomness: new Uint8Array(decoded.subarray(0, 32)),
+    tx,
+    slot: info.slot,
+    computeUnitsUsed: info.meta?.computeUnitsConsumed ?? 0,
+    costLamports: info.meta?.fee ?? 0,
+  };
+}
+
+/**
+ * Verify a drand beacon on-chain. Returns just the 32-byte randomness.
+ * Thin wrapper over `verifyDrandBeaconWithMeta` — use that variant if
+ * you also need the tx signature, slot, CU usage, or fee.
+ */
+export async function verifyDrandBeacon(args: {
+  connection: Connection;
+  signer: Keypair | Wallet;
+  round: bigint;
+  signature: Uint8Array;
+  programId?: PublicKey;
+  computeUnits?: number;
+  signal?: AbortSignal;
+  skipPreflight?: boolean;
+}): Promise<Uint8Array> {
+  const meta = await verifyDrandBeaconWithMeta(args);
+  return meta.randomness;
 }
 
 export async function getVerifiedRandomness(options: {
@@ -313,4 +366,42 @@ export async function getVerifiedRandomness(options: {
     signal: options.signal,
     skipPreflight: options.skipPreflight,
   });
+}
+
+/**
+ * Fetch the current (or specified) drand round AND verify it on-chain
+ * in a single call, returning the full proof record: round + drand
+ * signature + randomness + tx + slot + CU + fee. Use for consumers
+ * like the alea.so public relayer that need all fields in one shot.
+ *
+ * Added in 0.2.0.
+ */
+export async function getVerifiedRandomnessWithMeta(options: {
+  connection: Connection;
+  signer: Keypair | Wallet;
+  programId?: PublicKey;
+  round?: bigint;
+  computeUnits?: number;
+  signal?: AbortSignal;
+  skipPreflight?: boolean;
+}): Promise<VerifyMeta & { round: bigint; signature: Uint8Array }> {
+  const round = options.round ?? getCurrentRound();
+  const beacon = await fetchBeacon(round, { signal: options.signal });
+
+  const meta = await verifyDrandBeaconWithMeta({
+    connection: options.connection,
+    signer: options.signer,
+    round: beacon.round,
+    signature: beacon.signature,
+    programId: options.programId,
+    computeUnits: options.computeUnits,
+    signal: options.signal,
+    skipPreflight: options.skipPreflight,
+  });
+
+  return {
+    ...meta,
+    round: beacon.round,
+    signature: beacon.signature,
+  };
 }
