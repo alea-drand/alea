@@ -14,7 +14,7 @@ assignees: ''
 
 - **Cluster:** <!-- mainnet-beta / devnet / localnet / testnet -->
 - **Alea program ID used:** <!-- from docs site or README -->
-- **SDK language:** <!-- Rust (alea-sdk) / TypeScript (@alea/sdk) / raw -->
+- **SDK language:** <!-- Rust (alea-sdk) / TypeScript (@alea-drand/sdk) / raw -->
 - **SDK version:** <!-- from `cargo.toml` or `package.json` -->
 - **Anchor version:** <!-- from `anchor --version` -->
 - **Rust version** (if applicable): <!-- `rustc --version` -->
