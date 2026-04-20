@@ -61,9 +61,6 @@
       "optional": true
     }
   },
-  "dependencies": {
-    "@noble/hashes": "^1.5"
-  },
   "devDependencies": {
     "typescript": "^5.4",
     "vitest": "^2.1",
