@@ -36,7 +36,7 @@ alea-verifier = { path = "../../programs/alea-verifier", version = "=0.1.0", fea
 solana-client = "=1.18.26"
 solana-sdk = "=1.18.26"
 solana-transaction-status = "=1.18.26"
-bincode = "=1.3.3"
+bincode = "=3.0.0"
 hex-literal = "0.4"
 
 [package.metadata.docs.rs]
