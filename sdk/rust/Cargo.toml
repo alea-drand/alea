@@ -37,7 +37,7 @@ solana-client = "=1.18.26"
 solana-sdk = "=1.18.26"
 solana-transaction-status = "=1.18.26"
 bincode = "=1.3.3"
-hex-literal = "0.4"
+hex-literal = "1.1"
 
 [package.metadata.docs.rs]
 # Phase 4.5: cpi feature removed (T1-14); all-features default since crate
