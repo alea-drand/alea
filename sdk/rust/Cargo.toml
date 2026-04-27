@@ -34,7 +34,7 @@ alea-verifier = { path = "../../programs/alea-verifier", version = "=0.1.0", fea
 # (anchor-lang 0.30.1 → solana-program 1.18.26).
 [dev-dependencies]
 solana-client = "=1.18.26"
-solana-sdk = "=1.18.26"
+solana-sdk = "=2.3.1"
 solana-transaction-status = "=1.18.26"
 bincode = "=1.3.3"
 hex-literal = "0.4"
